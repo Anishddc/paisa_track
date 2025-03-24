@@ -1465,11 +1465,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
 
     return SizedBox(
-      height: 130,
+      height: 140,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _accounts.length + 1, // +1 for add account card
+        itemCount: _accounts.length + 1,
         itemBuilder: (context, index) {
           if (index == _accounts.length) {
             return _buildAddAccountCard();
@@ -1484,39 +1484,41 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget _buildAddAccountCard() {
     return Container(
       margin: const EdgeInsets.only(right: 16, bottom: 8),
-      width: 120,
+      width: 100,
       child: Card(
-        elevation: 2,
-        shadowColor: Colors.black.withOpacity(0.1),
+        elevation: 4,
+        shadowColor: Colors.black.withOpacity(0.15),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           side: BorderSide(
             color: ColorConstants.primaryColor.withOpacity(0.2),
-            width: 1,
+            width: 1.5,
           ),
         ),
         child: InkWell(
           onTap: () => _navigateToAccountsScreen(showAddDialog: true),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircleAvatar(
-                radius: 20,
+                radius: 16,
                 backgroundColor: ColorConstants.primaryColor.withOpacity(0.1),
                 child: Icon(
                   Icons.add,
                   color: ColorConstants.primaryColor,
+                  size: 20,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
               Text(
-                'Add\nAccount',
+                'Add New\nAccount',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
                   color: ColorConstants.primaryColor,
+                  height: 1.2,
                 ),
               ),
             ],
@@ -1528,25 +1530,23 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Widget _buildAccountCard(AccountModel account, double maxBalance) {
     final balancePercentage = maxBalance > 0 ? account.balance / maxBalance : 0;
-    
-    // Get currency symbol from the user's default currency code
     final currencySymbol = CurrencyUtils.getCurrencySymbol(_currencyCode);
     
     return Container(
       margin: const EdgeInsets.only(right: 16, bottom: 8),
-      width: 150,
+      width: 120,
       child: Card(
         elevation: 4,
-        shadowColor: Colors.black.withOpacity(0.1),
+        shadowColor: Colors.black.withOpacity(0.15),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: InkWell(
           onTap: _navigateToAccountsScreen,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           child: Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -1556,43 +1556,74 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ],
               ),
             ),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    account.bankLogoPath != null && account.bankLogoPath!.isNotEmpty
-                      ? ClipOval(
-                          child: Image.asset(
-                            account.bankLogoPath!,
-                            width: 18,
-                            height: 18,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Icon(
-                                account.icon,
-                                color: Colors.white,
-                                size: 18,
-                              );
-                            },
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: account.bankLogoPath != null && account.bankLogoPath!.isNotEmpty
+                        ? ClipOval(
+                            child: Image.asset(
+                              account.bankLogoPath!,
+                              width: 14,
+                              height: 14,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  account.icon,
+                                  color: Colors.white,
+                                  size: 14,
+                                );
+                              },
+                            ),
+                          )
+                        : Icon(
+                            account.icon,
+                            color: Colors.white,
+                            size: 14,
                           ),
-                        )
-                      : Icon(
-                          account.icon,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                    const SizedBox(width: 8),
+                    ),
+                    const SizedBox(width: 3),
                     Expanded(
-                      child: Text(
-                        account.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            account.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 1),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 3,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              account.type.name.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 7,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -1603,29 +1634,28 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: 12,
                   ),
                 ),
-                const SizedBox(height: 8),
-                // Progress bar showing the percentage of balance compared to max
-                Stack(
-                  children: [
-                    Container(
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(2),
+                const SizedBox(height: 3),
+                Container(
+                  height: 2,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 120.0 * balancePercentage,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(1),
+                        ),
                       ),
-                    ),
-                    Container(
-                      height: 4,
-                      width: balancePercentage * 126, // 126 = width - padding
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1656,7 +1686,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         children: [
           Expanded(child: _buildNavItem(0, Icons.dashboard_outlined, 'Home', isActive: _selectedIndex == 0)),
           Expanded(child: _buildNavItem(1, Icons.account_balance_wallet_outlined, 'Accounts')),
-          const SizedBox(width: 60), // Space for the FAB
+          const SizedBox(width: 60),
           Expanded(child: _buildNavItem(2, Icons.category_outlined, 'Categories')),
           Expanded(child: _buildNavItem(3, Icons.analytics_outlined, 'Reports')),
         ],
@@ -1707,7 +1737,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return Container(
       height: 52,
       width: 52,
-      margin: const EdgeInsets.only(bottom: 8), // Adjustment for positioning
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -1731,7 +1761,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            // Navigate to add transaction screen
             Navigator.pushNamed(context, AppRouter.addTransaction);
           },
           customBorder: const CircleBorder(),
@@ -1872,7 +1901,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             leading: const Icon(Icons.info_outline),
             title: const Text('About'),
             onTap: () {
-              Navigator.pop(context); // Close the drawer
+              Navigator.pop(context);
               Navigator.pushNamed(context, AppRouter.about);
             },
           ),
@@ -1893,7 +1922,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         children: [
           Row(
             children: [
-              // User avatar or default icon
               if (userProfile?.profileImagePath != null)
                 CircleAvatar(
                   radius: 32,
@@ -1964,13 +1992,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  // Add missing methods
   Future<void> _refreshData() async {
-    await _loadData();  // Use the existing _loadData method instead
+    await _loadData();
     setState(() {});
   }
 
-  // Add the missing _buildDashboardContent method
   Widget _buildDashboardContent() {
     return RefreshIndicator(
       onRefresh: _refreshData,
@@ -1988,14 +2014,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             _buildRecentTransactions(),
             const SizedBox(height: 24),
             _buildAccountsList(),
-            const SizedBox(height: 100), // Extra space for FAB and bottom nav
+            const SizedBox(height: 100),
           ],
         ),
       ),
     );
   }
 
-  // Add this method to show menu options
   void _showDashboardMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -2052,7 +2077,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 }
 
-// Replace the ShimmerLoading implementation with a more stable version
 class ShimmerLoading extends StatefulWidget {
   final Color baseColor;
   final Color highlightColor;
@@ -2109,7 +2133,6 @@ class _ShimmerLoadingState extends State<ShimmerLoading> with SingleTickerProvid
   }
 }
 
-// Fix WavePainter animation for stability
 class WavePainter extends CustomPainter {
   final Color color;
   final double waveHeight;
@@ -2129,15 +2152,11 @@ class WavePainter extends CustomPainter {
 
     final path = Path();
     
-    // Use a simpler implementation to avoid math errors
-    // Calculate a safe y value based on progress
     final safeProgress = progress.clamp(0.0, 1.0);
     final y = size.height * (1 - safeProgress);
 
-    // Simple wave design
     path.moveTo(0, y);
     
-    // First curve
     path.quadraticBezierTo(
       size.width / 4, 
       y - waveHeight,
@@ -2145,7 +2164,6 @@ class WavePainter extends CustomPainter {
       y
     );
     
-    // Second curve
     path.quadraticBezierTo(
       size.width * 3 / 4, 
       y + waveHeight,
@@ -2153,7 +2171,6 @@ class WavePainter extends CustomPainter {
       y
     );
     
-    // Complete the path
     path.lineTo(size.width, size.height);
     path.lineTo(0, size.height);
     path.close();

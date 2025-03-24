@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:paisa_track/core/constants/color_constants.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class UpdateService {
   // TODO: Update these with your actual GitHub repository details
@@ -15,179 +16,113 @@ class UpdateService {
   static String get _githubApiUrl => 'https://api.github.com/repos/$_githubUsername/$_githubRepo/releases';
   static String get _githubReleaseUrl => 'https://github.com/$_githubUsername/$_githubRepo/releases';
   
+  static const Duration _timeout = Duration(seconds: 10);
+  static const String _lastCheckKey = 'last_update_check';
+
   static Future<void> checkForUpdates(BuildContext context) async {
     try {
-      // First check internet connectivity
-      try {
-        final result = await InternetAddress.lookup('google.com');
-        if (result.isEmpty || result[0].rawAddress.isEmpty) {
-          if (context.mounted) {
-            _showErrorDialog(context, 'No internet connection available. Please check your connection and try again.');
-          }
-          return;
-        }
-      } on SocketException catch (_) {
-        if (context.mounted) {
-          _showErrorDialog(context, 'No internet connection available. Please check your connection and try again.');
-        }
+      // Check if we should perform the update check
+      if (!await _shouldCheckForUpdates()) {
         return;
       }
 
-      // Get current app version
-      PackageInfo packageInfo = await PackageInfo.fromPlatform();
-      String currentVersion = packageInfo.version;
-      
-      // Get releases from GitHub with timeout and headers
-      final response = await http.get(
-        Uri.parse(_githubApiUrl),
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'PaisaTrack-App',
-        },
-      ).timeout(const Duration(seconds: 15));
-      
+      final packageInfo = await PackageInfo.fromPlatform();
+      final currentVersion = packageInfo.version;
+      final currentBuildNumber = packageInfo.buildNumber;
+
+      final response = await http.get(Uri.parse(_githubApiUrl))
+          .timeout(_timeout, onTimeout: () {
+        throw TimeoutException('Update check timed out');
+      });
+
       if (response.statusCode == 200) {
         final List<dynamic> releases = json.decode(response.body);
-        
         if (releases.isEmpty) {
-          if (context.mounted) {
-            _showNoReleasesDialog(context);
-          }
           return;
         }
-        
-        // Find the latest version including beta releases
-        String? latestVersion;
-        String? latestReleaseUrl;
-        
-        for (final release in releases) {
-          final tagName = release['tag_name'].toString();
-          final downloadUrl = release['html_url'].toString();
-          
-          // Skip if tag name is empty
-          if (tagName.isEmpty) continue;
-          
-          // Remove 'v' prefix if present
-          final version = tagName.startsWith('v') ? tagName.substring(1) : tagName;
-          
-          if (latestVersion == null || _compareVersions(version, latestVersion) > 0) {
-            latestVersion = version;
-            latestReleaseUrl = downloadUrl;
-          }
-        }
-        
-        if (latestVersion != null) {
-          // Compare versions
-          if (_compareVersions(latestVersion, currentVersion) > 0) {
-            // Show update dialog
-            if (context.mounted) {
-              _showUpdateDialog(context, latestVersion, latestReleaseUrl!);
-            }
-          } else if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('You are using the latest version'),
-                backgroundColor: ColorConstants.successColor,
-              ),
-            );
+
+        // Find the latest release (including beta releases)
+        final latestRelease = releases.first;
+        final latestVersion = latestRelease['tag_name'].toString().replaceAll('v', '');
+        final latestUrl = latestRelease['html_url'];
+
+        // Compare versions
+        if (_compareVersions(latestVersion, currentVersion) > 0) {
+          if (context.mounted) {
+            _showUpdateDialog(context, latestUrl);
           }
         }
       } else if (response.statusCode == 404) {
-        debugPrint('No releases found in repository: $_githubUsername/$_githubRepo');
-        if (context.mounted) {
-          _showNoReleasesDialog(context);
-        }
-      } else {
-        debugPrint('GitHub API response status: ${response.statusCode}');
-        debugPrint('GitHub API response body: ${response.body}');
-        if (context.mounted) {
-          _showErrorDialog(
-            context, 
-            'Failed to check for updates (Status: ${response.statusCode}). Please try again later.'
-          );
-        }
+        // No releases found, this is normal for new repositories
+        return;
       }
     } catch (e) {
-      debugPrint('Error checking for updates: $e');
-      if (context.mounted) {
-        if (e is TimeoutException) {
-          _showErrorDialog(context, 'Update check timed out. Please check your internet connection and try again.');
-        } else if (e is SocketException) {
-          _showErrorDialog(context, 'Network error. Please check your internet connection and try again.');
-        } else {
-          _showErrorDialog(context, 'Failed to check for updates: ${e.toString()}');
-        }
-      }
+      // Log the error but don't show it to the user
+      print('Update check failed: $e');
+    } finally {
+      // Save the last check time regardless of success or failure
+      await _saveLastCheckTime();
     }
   }
-  
+
+  static Future<bool> _shouldCheckForUpdates() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastCheck = DateTime.fromMillisecondsSinceEpoch(
+      prefs.getInt(_lastCheckKey) ?? 0
+    );
+    final now = DateTime.now();
+    
+    // Check once per day
+    return now.difference(lastCheck).inDays >= 1;
+  }
+
+  static Future<void> _saveLastCheckTime() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_lastCheckKey, DateTime.now().millisecondsSinceEpoch);
+  }
+
   static int _compareVersions(String v1, String v2) {
-    try {
-      // Handle beta versions
-      final v1Parts = v1.split('-')[0].split('.').map(int.parse).toList();
-      final v2Parts = v2.split('-')[0].split('.').map(int.parse).toList();
+    final v1Parts = v1.split('.');
+    final v2Parts = v2.split('.');
+    
+    for (int i = 0; i < 3; i++) {
+      final v1Num = int.parse(v1Parts[i]);
+      final v2Num = int.parse(v2Parts[i]);
       
-      // Ensure both lists have at least 3 elements
-      while (v1Parts.length < 3) v1Parts.add(0);
-      while (v2Parts.length < 3) v2Parts.add(0);
-      
-      for (int i = 0; i < 3; i++) {
-        if (v1Parts[i] > v2Parts[i]) return 1;
-        if (v1Parts[i] < v2Parts[i]) return -1;
-      }
-      
-      // If versions are equal, check for beta/pre-release
-      final v1IsBeta = v1.contains('-beta') || v1.contains('-alpha');
-      final v2IsBeta = v2.contains('-beta') || v2.contains('-alpha');
-      
-      if (!v1IsBeta && v2IsBeta) return 1; // Non-beta is newer than beta
-      if (v1IsBeta && !v2IsBeta) return -1; // Beta is older than non-beta
-      
-      return 0;
-    } catch (e) {
-      debugPrint('Error comparing versions: $e');
-      return 0;
+      if (v1Num > v2Num) return 1;
+      if (v1Num < v2Num) return -1;
     }
+    
+    return 0;
   }
-  
-  static Future<void> _showUpdateDialog(BuildContext context, String latestVersion, String downloadUrl) async {
+
+  static Future<void> _showUpdateDialog(BuildContext context, String url) async {
     return showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('New Update Available'),
-          content: Text('A new version ($latestVersion) is available. Would you like to update now?'),
-          actions: <Widget>[
+          title: const Text('Update Available'),
+          content: const Text('A new version of Paisa Track is available. Would you like to update now?'),
+          actions: [
             TextButton(
+              onPressed: () => Navigator.of(context).pop(),
               child: const Text('Later'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
             ),
-            TextButton(
-              child: const Text('Update'),
+            ElevatedButton(
               onPressed: () async {
-                try {
-                  if (await canLaunchUrl(Uri.parse(downloadUrl))) {
-                    await launchUrl(Uri.parse(downloadUrl));
-                    if (context.mounted) {
-                      Navigator.of(context).pop();
-                    }
-                  } else {
-                    throw Exception('Could not launch URL');
-                  }
-                } catch (e) {
+                if (await canLaunchUrl(Uri.parse(url))) {
+                  await launchUrl(Uri.parse(url));
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Could not open update page: ${e.toString()}'),
-                        backgroundColor: ColorConstants.errorColor,
-                      ),
-                    );
+                    Navigator.of(context).pop();
                   }
                 }
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ColorConstants.primaryColor,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Update Now'),
             ),
           ],
         );
