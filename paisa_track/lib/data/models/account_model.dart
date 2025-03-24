@@ -54,6 +54,8 @@ class AccountModel extends HiveObject {
   @HiveField(14)
   final String? bankLogoPath;
   
+  static const IconData defaultIcon = Icons.account_balance;  // Make this constant
+  
   AccountModel({
     String? id,
     required this.name,

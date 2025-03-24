@@ -25,6 +25,7 @@ import 'package:provider/provider.dart';
 import 'package:paisa_track/providers/auth_provider.dart';
 import 'package:paisa_track/providers/user_profile_provider.dart';
 import 'package:paisa_track/data/models/app_icon.dart';
+import '../../../data/services/update_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -110,6 +111,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           }
         }
       }
+    });
+
+    // Check for updates when the screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateService.checkForUpdates(context);
     });
   }
   
