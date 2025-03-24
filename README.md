@@ -47,5 +47,11 @@ If you encounter any issues or have suggestions:
 ## Updates
 The app will automatically check for updates when you launch it. When a new version is available, you'll be prompted to download and install it.
 
+You can also manually check for updates:
+1. Open the app
+2. Go to Settings
+3. Tap "Check for Updates"
+4. If a new version is available, you'll be prompted to download and install it
+
 ## License
 This project is licensed under the MIT License - see the LICENSE file for details. 

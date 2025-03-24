@@ -12,6 +12,7 @@ import 'package:paisa_track/data/services/database_service.dart';
 import 'package:paisa_track/data/services/backup_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
+import '../../../data/services/update_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -142,6 +143,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const Divider(),
                   _buildAboutSection(),
                   const SizedBox(height: 24),
+                  
+                  // Add Check for Updates option
+                  ListTile(
+                    leading: const Icon(Icons.system_update),
+                    title: const Text('Check for Updates'),
+                    subtitle: const Text('Check if a new version is available'),
+                    onTap: () async {
+                      // Show loading indicator
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (BuildContext context) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        },
+                      );
+                      
+                      // Check for updates
+                      await UpdateService.checkForUpdates(context);
+                      
+                      // Hide loading indicator
+                      if (context.mounted) {
+                        Navigator.of(context).pop();
+                      }
+                    },
+                  ),
                 ],
               ),
         bottomNavigationBar: _buildBottomNavigationBar(),
