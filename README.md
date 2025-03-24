@@ -6,13 +6,18 @@ A local-only money tracking app built with Flutter. Track your expenses, manage 
 
 ### Android Users
 1. Go to the [Latest Release](https://github.com/Anishddc/paisa_track/releases/latest)
-2. Download the `app-release.apk` file
-3. On your Android device:
+2. Scroll down to the "Assets" section
+3. Download the `app-release.apk` file (NOT the Source code files)
+4. On your Android device:
    - Open Settings
    - Go to Security/Privacy
-   - Enable "Install from Unknown Sources"
-   - Open the downloaded APK file
+   - Enable "Install from Unknown Sources" or "Install Unknown Apps"
+   - If prompted which app to allow, choose your browser or file manager
+   - Open the downloaded APK file from your Downloads folder
    - Tap "Install"
+   - If Play Protect shows a warning, tap "More details" and then "Install anyway"
+
+Note: If you see only zip or tar.gz files, please wait a few minutes as the APK is being uploaded.
 
 ### iOS Users
 Currently, iOS version is not available as the app is in beta testing. iOS version will be available soon through the App Store.
