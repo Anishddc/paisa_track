@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:paisa_track/data/models/account_model.dart';
+import 'package:paisa_track/data/models/enums/transaction_type.dart';
 import 'package:paisa_track/presentation/screens/accounts/account_details_screen.dart';
 import 'package:paisa_track/presentation/screens/accounts/accounts_screen.dart';
 import 'package:paisa_track/presentation/screens/bills/bills_screen.dart';
@@ -14,7 +15,7 @@ import 'package:paisa_track/presentation/screens/recurring/recurring_screen.dart
 import 'package:paisa_track/presentation/screens/reports/reports_screen.dart';
 import 'package:paisa_track/presentation/screens/scan/receipt_scanner_screen.dart';
 import 'package:paisa_track/presentation/screens/settings/settings_screen.dart';
-import 'package:paisa_track/presentation/screens/transactions/add_transaction_dialog.dart';
+import 'package:paisa_track/presentation/screens/transactions/add_transaction_screen.dart';
 import 'package:paisa_track/presentation/screens/transactions/all_transactions_screen.dart';
 import 'package:paisa_track/presentation/screens/transactions/transaction_details_screen.dart';
 import 'package:paisa_track/presentation/screens/transactions/transaction_statistics_screen.dart';
@@ -128,10 +129,31 @@ class AppRouter {
         );
         
       case addTransaction:
-        final account = routeSettings.arguments as AccountModel?;
-        return MaterialPageRoute(
-          builder: (_) => AddTransactionDialog(account: account),
-        );
+        final args = routeSettings.arguments;
+        
+        // Handle different argument types
+        if (args is Map<String, dynamic>) {
+          // Map arguments - could contain 'account' and/or 'initialType'
+          return MaterialPageRoute(
+            settings: routeSettings,
+            builder: (_) => AddTransactionScreen(
+              account: args.containsKey('account') ? args['account'] as AccountModel : null,
+              initialType: args.containsKey('initialType') ? args['initialType'] as TransactionType : null,
+            ),
+          );
+        } else if (args is AccountModel) {
+          // Direct account model
+          return MaterialPageRoute(
+            settings: routeSettings,
+            builder: (_) => AddTransactionScreen(account: args),
+          );
+        } else {
+          // No arguments, use defaults
+          return MaterialPageRoute(
+            settings: routeSettings,
+            builder: (_) => const AddTransactionScreen(),
+          );
+        }
         
       case transactionStatistics:
         return MaterialPageRoute(

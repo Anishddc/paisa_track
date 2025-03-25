@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'dart:math' as math;
@@ -8,19 +9,19 @@ import 'package:paisa_track/core/constants/color_constants.dart';
 import 'package:paisa_track/core/constants/text_constants.dart';
 import 'package:paisa_track/core/utils/app_router.dart';
 import 'package:paisa_track/data/models/account_model.dart';
-import 'package:paisa_track/data/models/transaction_model.dart';
+import 'package:paisa_track/data/models/category_model.dart';
+import 'package:paisa_track/data/models/enums/duration_filter.dart';
 import 'package:paisa_track/data/models/enums/transaction_type.dart';
+import 'package:paisa_track/data/models/transaction_model.dart';
 import 'package:paisa_track/data/models/enums/account_type.dart';
 import 'package:paisa_track/data/models/user_profile_model.dart';
 import 'package:paisa_track/data/repositories/account_repository.dart';
 import 'package:paisa_track/data/repositories/transaction_repository.dart';
 import 'package:paisa_track/data/repositories/user_repository.dart';
-import 'package:paisa_track/presentation/screens/transactions/add_transaction_dialog.dart';
+import 'package:paisa_track/presentation/screens/transactions/add_transaction_screen.dart';
 import 'package:paisa_track/presentation/widgets/common/loading_indicator.dart';
 import 'package:paisa_track/presentation/widgets/common/error_view.dart';
 import 'package:paisa_track/core/utils/currency_utils.dart';
-import 'package:paisa_track/data/repositories/user_repository.dart';
-import 'package:paisa_track/data/repositories/transaction_repository.dart';
 import 'package:provider/provider.dart';
 import 'package:paisa_track/providers/auth_provider.dart';
 import 'package:paisa_track/providers/user_profile_provider.dart';
@@ -45,8 +46,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   // Animations
   late Animation<double> _pulseAnimation;
   
-  int _selectedIndex = 0;
-  String _currentRoute = '';
   bool _isLoading = true;
   bool _showBalance = true;
   String? _error;
@@ -97,25 +96,31 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     _initializeUserData();
     _initializeAnimations();
     
-    // Check if we need to navigate immediately (e.g., from a tab selection)
+    // Initialize data first, then set up stream listeners
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final Object? args = ModalRoute.of(context)?.settings.arguments;
-      if (args != null && args is Map<String, dynamic>) {
-        if (args.containsKey('initialTab')) {
-          final int initialTab = args['initialTab'] as int;
-          if (initialTab >= 0 && initialTab <= 3 && initialTab != _selectedIndex) {
-            setState(() {
-              _selectedIndex = initialTab;
-              _pageController.jumpToPage(initialTab);
-            });
-          }
-        }
+      // Listeners are set up after the first build
+      _setupStreamListeners();
+      
+      // Check for updates when the screen loads
+      UpdateService.checkForUpdates(context);
+    });
+  }
+  
+  void _setupStreamListeners() {
+    // Listen to transaction changes
+    _transactionRepository.transactionsChanged.listen((_) {
+      debugPrint("Dashboard: Transaction change detected!");
+      if (mounted) {
+        _loadData();
       }
     });
-
-    // Check for updates when the screen loads
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      UpdateService.checkForUpdates(context);
+    
+    // Listen to account changes
+    _accountRepository.accountsChanged.listen((_) {
+      debugPrint("Dashboard: Account change detected!");
+      if (mounted) {
+        _loadData();
+      }
     });
   }
   
@@ -126,7 +131,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   @override
   void dispose() {
-    // Remove pulse animation controller disposal
+    // Ensure resources are properly cleaned up
     _scrollController.dispose();
     super.dispose();
   }
@@ -134,27 +139,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Refresh data when returning to the dashboard
-    _loadData();
-    
-    // Update current route
-    final route = ModalRoute.of(context)?.settings.name;
-    if (route != null) {
-      setState(() {
-        _currentRoute = route;
-        
-        // Map routes to tab indices
-        if (route == AppRouter.accounts) {
-          _selectedIndex = 1;
-        } else if (route == AppRouter.reports) {
-          _selectedIndex = 2;
-        } else if (route == AppRouter.settingsRoute) {
-          _selectedIndex = 3;
-        } else {
-          _selectedIndex = 0; // Default to dashboard
-        }
-      });
-    }
   }
 
   Future<void> _loadData() async {
@@ -229,44 +213,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
   
-  // Create a method to handle bottom tab navigation without duplicating stacks
-  void _onItemTapped(int index) {
-    if (index == _selectedIndex) return;
-    
-    // Don't update state here since we're navigating away
-    // Only update state when actually on the Dashboard
-    
-    switch (index) {
-      case 0: // Dashboard
-        // Already on dashboard, update the selected index
-        setState(() {
-          _selectedIndex = 0;
-        });
-        break;
-      case 1: // Accounts
-        Navigator.pushNamed(
-          context, 
-          AppRouter.accounts,
-          arguments: {'fromTab': true},
-        );
-        break;
-      case 2: // Categories
-        Navigator.pushNamed(
-          context, 
-          AppRouter.categories,
-          arguments: {'fromTab': true},
-        );
-        break;
-      case 3: // Reports
-        Navigator.pushNamed(
-          context, 
-          AppRouter.reports,
-          arguments: {'fromTab': true},
-        );
-        break;
-    }
-  }
-
   void _toggleBalanceVisibility() {
     setState(() {
       _showBalance = !_showBalance;
@@ -286,12 +232,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
   
   double _calculateIncomeChange() {
-    if (_lastMonthIncome == 0) return 0;
+    if (_lastMonthIncome == 0) {
+      return _totalIncome > 0 ? 100 : 0; // If no last month income but current income exists, show 100% increase
+    }
     return ((_totalIncome - _lastMonthIncome) / _lastMonthIncome) * 100;
   }
   
   double _calculateExpenseChange() {
-    if (_lastMonthExpense == 0) return 0;
+    if (_lastMonthExpense == 0) {
+      return _totalExpense > 0 ? 100 : 0; // If no last month expense but current expense exists, show 100% increase
+    }
     return ((_totalExpense - _lastMonthExpense) / _lastMonthExpense) * 100;
   }
 
@@ -363,206 +313,170 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        // On home tab, implement double-press to exit
-        final now = DateTime.now();
-        if (_lastBackPressTime == null || 
-            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
-          _lastBackPressTime = now;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Press back again to exit'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-          return false;
-        }
-        return true; // Exit app on second press within 2 seconds
-      },
-      child: Scaffold(
-        key: _scaffoldKey,
-        drawer: _buildDrawer(),
-        backgroundColor: Colors.grey.shade50,
-        body: NestedScrollView(
-          controller: _scrollController,
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              SliverAppBar(
-                expandedHeight: 180,
-                pinned: true,
-                floating: false,
-                snap: false,
-                elevation: 4,
-                forceElevated: true,
-                title: Text(_selectedIndex == 0 ? "Paisa Track" : ""),
-                leading: IconButton(
-                  icon: const Icon(
-                    Icons.menu,
-                    color: Colors.white,
+    return StreamBuilder<void>(
+      stream: _transactionRepository.transactionsChanged,
+      builder: (context, txSnapshot) {
+        return StreamBuilder<void>(
+          stream: _accountRepository.accountsChanged,
+          builder: (context, accSnapshot) {
+            // Always reload data when either stream emits an event
+            if (txSnapshot.connectionState == ConnectionState.active || 
+                accSnapshot.connectionState == ConnectionState.active) {
+              print("Stream event detected in Dashboard, reloading data...");
+              // Use Future.microtask to avoid build phase errors
+              Future.microtask(() => _loadData());
+            }
+            
+            return WillPopScope(
+              onWillPop: _onWillPop,
+              child: Scaffold(
+                key: _scaffoldKey,
+                appBar: _buildAppBar(),
+                drawer: _buildDrawer(),
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                body: _isLoading 
+                  ? const LoadingIndicator() 
+                  : (_error != null 
+                      ? ErrorView(message: _error!, onRetry: _loadData) 
+                      : _buildDashboardContent()),
+                floatingActionButton: _buildFloatingActionButton(),
+                floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+                bottomNavigationBar: Container(
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, -5),
+                      ),
+                    ],
                   ),
-                  onPressed: () {
-                    _scaffoldKey.currentState?.openDrawer();
-                  },
-                ),
-                actions: [
-                  IconButton(
-                    icon: Stack(
-                      children: [
-                        const Icon(
-                          Icons.notifications_none,
-                          color: Colors.white,
-                        ),
-                        if (_hasNotifications)
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                              constraints: const BoxConstraints(
-                                minWidth: 8,
-                                minHeight: 8,
-                              ),
-                            ),
-                          ),
-                      ],
+                  child: BottomAppBar(
+                    shape: const CircularNotchedRectangle(),
+                    notchMargin: 8.0,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildNavItem(0, Icons.dashboard_outlined, 'Home', () {
+                            // Already on dashboard
+                          }),
+                          _buildNavItem(1, Icons.account_balance_wallet_outlined, 'Accounts', () {
+                            Navigator.pushNamed(context, AppRouter.accounts);
+                          }),
+                          const SizedBox(width: 40), // Space for FAB
+                          _buildNavItem(2, Icons.category_outlined, 'Categories', () {
+                            Navigator.pushNamed(context, AppRouter.categories);
+                          }),
+                          _buildNavItem(3, Icons.bar_chart_outlined, 'Reports', () {
+                            Navigator.pushNamed(context, AppRouter.reports);
+                          }),
+                        ],
+                      ),
                     ),
-                    onPressed: () {
-                      // TODO: Open notifications
-                    },
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.settings, color: Colors.white),
-                    onPressed: () {
-                      Navigator.pushNamed(context, AppRouter.settingsRoute);
-                    },
-                  ),
-                ],
-                flexibleSpace: FlexibleSpaceBar(
-                  collapseMode: CollapseMode.pin,
-                  background: _buildUserSectionCompact(),
                 ),
               ),
-            ];
-          },
-          body: _buildDashboardContent(),
-        ),
-        floatingActionButton: _buildFloatingActionButton(),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        bottomNavigationBar: _buildBottomNavigationBar(),
-      ),
+            );
+          }
+        );
+      }
     );
   }
   
   Widget _buildUserSectionCompact() {
-    return Stack(
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                ColorConstants.primaryColor,
-                ColorConstants.primaryColor.withBlue(220),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            ColorConstants.primaryColor,
+            ColorConstants.primaryColor.withBlue(220),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          _buildProfileAvatar(),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      _getGreeting(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8, 
+                        vertical: 2
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: ColorConstants.accentColor.withOpacity(0.3),
+                      ),
+                      child: Text(
+                        'Active',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _userName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.local_fire_department,
+                      color: Colors.orange,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$_loginStreak days',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-        ),
-        SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 56), // Space for the AppBar title/actions
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  margin: const EdgeInsets.only(top: 4, bottom: 8),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    color: Colors.white.withOpacity(0.15),
-                  ),
-                  child: Row(
-                    children: [
-                      _buildProfileAvatar(),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  _getGreeting(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, 
-                                    vertical: 2
-                                  ),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
-                                    color: ColorConstants.accentColor.withOpacity(0.3),
-                                  ),
-                                  child: Text(
-                                    'Active',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.9),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _userName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.local_fire_department,
-                                  color: Colors.orange,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '$_loginStreak days',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.9),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
   
@@ -747,25 +661,31 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               ),
             ),
             const SizedBox(height: 20),
-            Container(
-              height: 6,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(3),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    height: 6,
-                    width: MediaQuery.of(context).size.width * 0.6, // Simplified
-                    decoration: BoxDecoration(
-                      color: Colors.greenAccent,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return Container(
+                  height: 6,
+                  width: constraints.maxWidth,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(3),
                   ),
-                ],
-              ),
+                  child: Row(
+                    children: [
+                      Container(
+                        height: 6,
+                        width: _totalBalance > 0 
+                            ? constraints.maxWidth * (_totalExpense / _totalBalance).clamp(0.0, 1.0)
+                            : 0,
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 20),
             Row(
@@ -838,26 +758,38 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           ],
         ),
         const SizedBox(height: 8),
-        Text(
-          _showBalance ? CurrencyUtils.formatCurrency(amount, currencyCode: _currencyCode) : '••••••••',
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            _showBalance ? CurrencyUtils.formatCurrency(amount, currencyCode: _currencyCode) : '••••••••',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
         ),
         const SizedBox(height: 6),
-        if (changePercent != 0)
+        if (changePercent == 0 && (label == 'Income' ? _lastMonthIncome == 0 : _lastMonthExpense == 0))
+          Text(
+            'No data',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withOpacity(0.7),
+            ),
+          )
+        else
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                changePercent > 0 ? Icons.trending_up : Icons.trending_down,
+                changePercent >= 0 ? Icons.trending_up : Icons.trending_down,
                 size: 12,
                 color: Colors.white,
               ),
               const SizedBox(width: 4),
               Text(
-                "${changePercent.abs().toStringAsFixed(1)}% ${changePercent > 0 ? 'up' : 'down'}",
+                "${changePercent.abs().toStringAsFixed(1)}% ${changePercent >= 0 ? 'up' : 'down'}",
                 style: const TextStyle(
                   fontSize: 12,
                   color: Colors.white,
@@ -865,14 +797,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
             ],
-          ),
-        if (changePercent == 0)
-          Text(
-            "No change",
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withOpacity(0.7),
-            ),
           ),
       ],
     );
@@ -893,7 +817,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).scaffoldBackgroundColor,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -921,11 +845,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     label: 'Accounts',
                     iconColor: Colors.blue,
                     onTap: () {
-                      Navigator.pushNamed(
-                        context, 
-                        AppRouter.accounts,
-                        arguments: {'fromTab': true},
-                      );
+                      Navigator.pushNamed(context, AppRouter.accounts);
                     },
                   ),
                   _buildQuickAction(
@@ -943,7 +863,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     label: 'Add',
                     iconColor: Colors.green,
                     onTap: () {
-                      Navigator.pushNamed(context, AppRouter.addTransaction, arguments: _accounts.isNotEmpty ? _accounts.first : null);
+                      _addTransaction();
                     },
                   ),
                   _buildQuickAction(
@@ -980,13 +900,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     icon: Icons.swap_horiz,
                     label: 'Transfer',
                     iconColor: Colors.cyan,
-                    onTap: () {
-                      // Navigate to transfer screen with type parameter
-                      Navigator.pushNamed(
-                        context, 
-                        AppRouter.addTransaction, 
-                        arguments: {'type': 'transfer', 'accounts': _accounts}
+                    onTap: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AddTransactionScreen(
+                            initialType: TransactionType.transfer,
+                          ),
+                        ),
                       );
+                      
+                      if (result == true) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Transfer added successfully'),
+                            backgroundColor: ColorConstants.successColor,
+                          ),
+                        );
+                        // No need to reload manually as we're listening to streams
+                      }
                     },
                   ),
                   // Expand/collapse button
@@ -1098,14 +1030,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     required Color iconColor,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 56,
-            height: 56,
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: iconColor.withOpacity(0.1),
               shape: BoxShape.circle,
@@ -1113,13 +1045,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             child: Icon(
               icon,
               color: iconColor,
-              size: 28,
+              size: 24,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             label,
-            textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
@@ -1162,7 +1093,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         const SizedBox(height: 16),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).scaffoldBackgroundColor,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -1202,12 +1133,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               : ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: Column(
-                children: _recentTransactions.map((transaction) {
+                    children: _recentTransactions.map((transaction) {
                       return _buildTransactionItemModern(transaction);
-                }).toList(),
+                    }).toList(),
                   ),
                 ),
-              ),
+        ),
       ],
     );
   }
@@ -1222,7 +1153,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       curve: Curves.easeIn,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).scaffoldBackgroundColor,
           border: !isLastItem ? Border(
             bottom: BorderSide(
               color: Colors.grey.withOpacity(0.15),
@@ -1230,7 +1161,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           ) : null,
         ),
-      child: ListTile(
+        child: ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           minVerticalPadding: 0,
           leading: Container(
@@ -1239,55 +1170,55 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               color: _getCategoryColor(transaction).withOpacity(0.15),
               shape: BoxShape.circle,
             ),
-          child: Icon(
-            _getCategoryIcon(transaction),
+            child: Icon(
+              _getCategoryIcon(transaction),
               color: _getCategoryColor(transaction),
               size: 18,
+            ),
           ),
-        ),
-        title: Text(
-          transaction.description,
-          style: const TextStyle(
+          title: Text(
+            transaction.description,
+            style: const TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 14,
-          ),
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          '${_getAccountName(transaction.accountId)} • ${dateFormat.format(transaction.date)}',
+          ),
+          subtitle: Text(
+            '${_getAccountName(transaction.accountId)} • ${dateFormat.format(transaction.date)}',
             style: TextStyle(
-            fontSize: 12,
+              fontSize: 12,
               color: Colors.grey[600],
-          ),
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Text(
-            (_showBalance ? CurrencyUtils.formatCurrency(transaction.amount, currencyCode: _currencyCode) : '••••••••'),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-              fontSize: 14,
-            color: _getAmountColor(transaction),
           ),
-        ),
-        onTap: () {
-          Navigator.pushNamed(
-            context,
-            AppRouter.transactionDetails,
-            arguments: transaction.id,
-          ).then((result) {
-            if (result == true) {
-              _loadData();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Transaction updated successfully'),
-                  backgroundColor: ColorConstants.successColor,
-                ),
-              );
-            }
-          });
-        },
+          trailing: Text(
+            (_showBalance ? CurrencyUtils.formatCurrency(transaction.amount, currencyCode: _currencyCode) : '••••••••'),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: _getAmountColor(transaction),
+            ),
+          ),
+          onTap: () {
+            Navigator.pushNamed(
+              context,
+              AppRouter.transactionDetails,
+              arguments: transaction.id,
+            ).then((result) {
+              if (result == true) {
+                _loadData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Transaction updated successfully'),
+                    backgroundColor: ColorConstants.successColor,
+                  ),
+                );
+              }
+            });
+          },
         ),
       ),
     );
@@ -1343,7 +1274,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       AppRouter.accounts,
       arguments: {
         'showAddDialog': showAddDialog,
-        'fromTab': false,
       },
     );
   }
@@ -1459,23 +1389,24 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildAccountsCarousel() {
-    double maxBalance = 0;
+    // Calculate total balance instead of max balance
+    double totalBalance = 0;
     if (_accounts.isNotEmpty) {
-      maxBalance = _accounts.map((e) => e.balance).reduce(math.max);
+      totalBalance = _accounts.fold(0, (sum, account) => sum + account.balance);
     }
 
     return SizedBox(
-      height: 140,
+      height: 245,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         itemCount: _accounts.length + 1,
         itemBuilder: (context, index) {
           if (index == _accounts.length) {
             return _buildAddAccountCard();
           }
           final account = _accounts[index];
-          return _buildAccountCard(account, maxBalance);
+          return _buildAccountCard(account, totalBalance);
         },
       ),
     );
@@ -1483,178 +1414,49 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Widget _buildAddAccountCard() {
     return Container(
-      margin: const EdgeInsets.only(right: 16, bottom: 8),
-      width: 100,
+      margin: const EdgeInsets.only(right: 8, bottom: 8),
+      width: 140,
+      height: 220,
       child: Card(
-        elevation: 4,
-        shadowColor: Colors.black.withOpacity(0.15),
+        elevation: 2,
+        shadowColor: Colors.black.withOpacity(0.1),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(
             color: ColorConstants.primaryColor.withOpacity(0.2),
-            width: 1.5,
+            width: 1,
           ),
         ),
         child: InkWell(
           onTap: () => _navigateToAccountsScreen(showAddDialog: true),
-          borderRadius: BorderRadius.circular(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: ColorConstants.primaryColor.withOpacity(0.1),
-                child: Icon(
-                  Icons.add,
-                  color: ColorConstants.primaryColor,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Add New\nAccount',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: ColorConstants.primaryColor,
-                  height: 1.2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAccountCard(AccountModel account, double maxBalance) {
-    final balancePercentage = maxBalance > 0 ? account.balance / maxBalance : 0;
-    final currencySymbol = CurrencyUtils.getCurrencySymbol(_currencyCode);
-    
-    return Container(
-      margin: const EdgeInsets.only(right: 16, bottom: 8),
-      width: 120,
-      child: Card(
-        elevation: 4,
-        shadowColor: Colors.black.withOpacity(0.15),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: InkWell(
-          onTap: _navigateToAccountsScreen,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  account.color.withOpacity(0.8),
-                  account.color,
-                ],
-              ),
-            ),
-            padding: const EdgeInsets.all(8),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: account.bankLogoPath != null && account.bankLogoPath!.isNotEmpty
-                        ? ClipOval(
-                            child: Image.asset(
-                              account.bankLogoPath!,
-                              width: 14,
-                              height: 14,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Icon(
-                                  account.icon,
-                                  color: Colors.white,
-                                  size: 14,
-                                );
-                              },
-                            ),
-                          )
-                        : Icon(
-                            account.icon,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                    ),
-                    const SizedBox(width: 3),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            account.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 1),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 3,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: Text(
-                              account.type.name.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 7,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                Text(
-                  '$currencySymbol${account.balance.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 3),
                 Container(
-                  height: 2,
-                  width: double.infinity,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(1),
+                    color: ColorConstants.primaryColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 120.0 * balancePercentage,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(1),
-                        ),
-                      ),
-                    ],
+                  child: Icon(
+                    Icons.add,
+                    color: ColorConstants.primaryColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Add Account',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: ColorConstants.primaryColor,
                   ),
                 ),
               ],
@@ -1665,69 +1467,175 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildBottomNavigationBar() {
+  Widget _buildAccountCard(AccountModel account, double totalBalance) {
+    // Calculate percentage based on total balance instead of max balance
+    final balancePercentage = totalBalance > 0 ? (account.balance / totalBalance).clamp(0.0, 1.0) : 0.0;
+    final currencySymbol = CurrencyUtils.getCurrencySymbol(_currencyCode);
+    
     return Container(
-      height: 65,
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 12,
-            spreadRadius: 1,
-            offset: const Offset(0, 3),
+      margin: const EdgeInsets.only(right: 8, bottom: 8),
+      width: 250,
+      child: Card(
+        elevation: 8,
+        shadowColor: account.color.withOpacity(0.3),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: InkWell(
+          onTap: () => Navigator.pushNamed(context, AppRouter.accounts),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  account.color.withOpacity(0.9),
+                  account.color,
+                  Color.lerp(account.color, Colors.black, 0.3) ?? account.color,
+                ],
+                stops: const [0.0, 0.6, 1.0],
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Account Type Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      account.bankLogoPath != null && account.bankLogoPath!.isNotEmpty
+                        ? ClipOval(
+                            child: Image.asset(
+                              account.bankLogoPath!,
+                              width: 18,
+                              height: 18,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  account.icon,
+                                  color: Colors.white,
+                                  size: 18,
+                                );
+                              },
+                            ),
+                          )
+                        : Icon(
+                            account.icon,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                      const SizedBox(width: 8),
+                      Text(
+                        account.type.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                
+                // Account Name
+                Text(
+                  account.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    letterSpacing: 0.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+                
+                // Balance
+                Text(
+                  'Balance',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _showBalance 
+                      ? '$currencySymbol${account.balance.toStringAsFixed(2)}'
+                      : '••••••••',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Progress Bar Section
+                Text(
+                  '${(balancePercentage * 100).toStringAsFixed(1)}% of total', // Changed to 1 decimal place
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Stack(
+                      children: [
+                        // Background
+                        Container(
+                          height: 8,
+                          width: constraints.maxWidth,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        // Progress
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.easeInOut,
+                          height: 8,
+                          width: constraints.maxWidth * balancePercentage,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.5),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          Expanded(child: _buildNavItem(0, Icons.dashboard_outlined, 'Home', isActive: _selectedIndex == 0)),
-          Expanded(child: _buildNavItem(1, Icons.account_balance_wallet_outlined, 'Accounts')),
-          const SizedBox(width: 60),
-          Expanded(child: _buildNavItem(2, Icons.category_outlined, 'Categories')),
-          Expanded(child: _buildNavItem(3, Icons.analytics_outlined, 'Reports')),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(int index, IconData icon, String label, {bool isActive = false}) {
-    return InkWell(
-      onTap: () => _onItemTapped(index),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              height: 36,
-              width: 36,
-              decoration: BoxDecoration(
-                color: isActive ? ColorConstants.primaryColor.withOpacity(0.15) : Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 22,
-                color: isActive ? ColorConstants.primaryColor : Colors.grey.shade500,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.0,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                color: isActive ? ColorConstants.primaryColor : Colors.grey.shade500,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -1760,9 +1668,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            Navigator.pushNamed(context, AppRouter.addTransaction);
-          },
+          onTap: _addTransaction,
           customBorder: const CircleBorder(),
           child: const Center(
             child: Icon(
@@ -1778,6 +1684,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Widget _buildDrawer() {
     return Drawer(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
@@ -1785,12 +1692,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           _buildDrawerItem(
             icon: Icons.dashboard,
             title: 'Dashboard',
-            selected: _selectedIndex == 0,
             onTap: () {
               Navigator.pop(context);
-              setState(() {
-                _selectedIndex = 0;
-              });
             },
           ),
           _buildDrawerItem(
@@ -1798,11 +1701,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             title: 'Accounts',
             onTap: () {
               Navigator.pop(context);
-              Navigator.pushNamed(
-                context, 
-                AppRouter.accounts,
-                arguments: {'fromTab': true},
-              );
+              Navigator.pushNamed(context, AppRouter.accounts);
             },
           ),
           _buildDrawerItem(
@@ -1922,6 +1821,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         children: [
           Row(
             children: [
+              // User avatar or default icon
               if (userProfile?.profileImagePath != null)
                 CircleAvatar(
                   radius: 32,
@@ -1969,34 +1869,34 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     required IconData icon,
     required String title,
     required VoidCallback onTap,
-    bool selected = false,
   }) {
     return ListTile(
       leading: Icon(
         icon,
         size: 20,
-        color: selected ? ColorConstants.primaryColor : null,
+        color: Colors.black,
       ),
       title: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 14,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-          color: selected ? ColorConstants.primaryColor : null,
+          fontWeight: FontWeight.normal,
+          color: Colors.black,
         ),
       ),
       dense: true,
-      selected: selected,
       onTap: onTap,
       visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
     );
   }
 
+  // Add missing methods
   Future<void> _refreshData() async {
-    await _loadData();
+    await _loadData();  // Use the existing _loadData method instead
     setState(() {});
   }
 
+  // Add the missing _buildDashboardContent method
   Widget _buildDashboardContent() {
     return RefreshIndicator(
       onRefresh: _refreshData,
@@ -2007,6 +1907,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 16),
+            _buildUserSectionCompact(),
+            const SizedBox(height: 24),
             _buildTotalBalanceCard(),
             const SizedBox(height: 24),
             _buildQuickAccess(),
@@ -2014,13 +1916,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             _buildRecentTransactions(),
             const SizedBox(height: 24),
             _buildAccountsList(),
-            const SizedBox(height: 100),
+            const SizedBox(height: 100), // Extra space for FAB and bottom nav
           ],
         ),
       ),
     );
   }
 
+  // Add this method to show menu options
   void _showDashboardMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -2075,8 +1978,112 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       ),
     );
   }
+
+  Widget _buildNavItem(int index, IconData icon, String label, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: index == 0 ? ColorConstants.primaryColor : Colors.grey,
+                size: 22,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: index == 0 ? ColorConstants.primaryColor : Colors.grey,
+                  fontWeight: index == 0 ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Update navigation for the FAB + button
+  void _addTransaction() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AddTransactionScreen(),
+      ),
+    );
+    
+    if (result == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transaction added successfully'),
+          backgroundColor: ColorConstants.successColor,
+        ),
+      );
+      // No need to reload manually as we're listening to streams
+    }
+  }
+
+  // Find the AppBar and add a reload button
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: const Text('Paisa Track'),
+      actions: [
+        // Add a reload button
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Reload data',
+          onPressed: () {
+            _loadData();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Data refreshed'),
+                duration: Duration(seconds: 1),
+              ),
+            );
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.search),
+          onPressed: () {
+            // TODO: Implement search
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.settings),
+          onPressed: () {
+            Navigator.pushNamed(context, AppRouter.settingsRoute);
+          },
+        ),
+      ],
+    );
+  }
+
+  Future<bool> _onWillPop() {
+    final now = DateTime.now();
+    if (_lastBackPressTime == null || 
+        now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+      _lastBackPressTime = now;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Press back again to exit'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return Future.value(false);
+    }
+    return Future.value(true);
+  }
 }
 
+// Replace the ShimmerLoading implementation with a more stable version
 class ShimmerLoading extends StatefulWidget {
   final Color baseColor;
   final Color highlightColor;
@@ -2133,6 +2140,7 @@ class _ShimmerLoadingState extends State<ShimmerLoading> with SingleTickerProvid
   }
 }
 
+// Fix WavePainter animation for stability
 class WavePainter extends CustomPainter {
   final Color color;
   final double waveHeight;
@@ -2152,11 +2160,15 @@ class WavePainter extends CustomPainter {
 
     final path = Path();
     
+    // Use a simpler implementation to avoid math errors
+    // Calculate a safe y value based on progress
     final safeProgress = progress.clamp(0.0, 1.0);
     final y = size.height * (1 - safeProgress);
 
+    // Simple wave design
     path.moveTo(0, y);
     
+    // First curve
     path.quadraticBezierTo(
       size.width / 4, 
       y - waveHeight,
@@ -2164,6 +2176,7 @@ class WavePainter extends CustomPainter {
       y
     );
     
+    // Second curve
     path.quadraticBezierTo(
       size.width * 3 / 4, 
       y + waveHeight,
@@ -2171,6 +2184,7 @@ class WavePainter extends CustomPainter {
       y
     );
     
+    // Complete the path
     path.lineTo(size.width, size.height);
     path.lineTo(0, size.height);
     path.close();

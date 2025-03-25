@@ -10,8 +10,8 @@ import 'package:paisa_track/data/repositories/account_repository.dart';
 import 'package:paisa_track/data/repositories/transaction_repository.dart';
 import 'package:paisa_track/data/repositories/user_repository.dart';
 import 'package:paisa_track/presentation/screens/accounts/account_details_screen.dart';
-import 'package:paisa_track/presentation/screens/accounts/add_account_dialog.dart';
-import 'package:paisa_track/presentation/screens/accounts/add_transaction_dialog.dart';
+import 'package:paisa_track/presentation/screens/accounts/add_account_screen.dart';
+import 'package:paisa_track/presentation/screens/transactions/add_transaction_screen.dart';
 import 'package:paisa_track/presentation/screens/accounts/edit_account_dialog.dart';
 import 'package:paisa_track/presentation/screens/dashboard/dashboard_screen.dart';
 import 'package:paisa_track/core/utils/app_router.dart';
@@ -32,22 +32,50 @@ class _AccountsScreenState extends State<AccountsScreen> {
   List<AccountModel> _accounts = [];
   String _defaultCurrencyCode = 'USD';
   String _userName = '';
+  bool _isSearching = false;
   
   @override
   void initState() {
     super.initState();
     _loadData();
     
-    // Check if we need to show the add account dialog immediately
+    // Set up stream listeners after initial data load
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupStreamListeners();
+      
+      // Check if we need to show the add account dialog immediately
       final Object? args = ModalRoute.of(context)?.settings.arguments;
       if (args != null && args is Map<String, dynamic>) {
         // Show add dialog if requested
         if (args.containsKey('showAddDialog') && args['showAddDialog'] == true) {
-          _showAddAccountDialog();
+          _navigateToAddAccount();
         }
       }
     });
+  }
+  
+  void _setupStreamListeners() {
+    // Listen to account changes
+    _accountRepository.accountsChanged.listen((_) {
+      debugPrint("Accounts Screen: Account change detected!");
+      if (mounted) {
+        _loadData();
+      }
+    });
+    
+    // Listen to transaction changes (for balance updates)
+    _transactionRepository.transactionsChanged.listen((_) {
+      debugPrint("Accounts Screen: Transaction change detected!");
+      if (mounted) {
+        _loadData();
+      }
+    });
+  }
+  
+  @override
+  void dispose() {
+    // Clean up any resources
+    super.dispose();
   }
   
   Future<void> _loadData() async {
@@ -101,44 +129,34 @@ class _AccountsScreenState extends State<AccountsScreen> {
     // This would require adding a displayOrder field to AccountModel
   }
   
-  Future<void> _showAddAccountDialog() async {
-    final AccountModel? newAccount = await showDialog<AccountModel>(
-      context: context,
-      builder: (BuildContext context) {
-        return AddAccountDialog(
+  Future<void> _navigateToAddAccount() async {
+    final userRepository = UserRepository();
+    final userProfile = await userRepository.getUserProfile();
+    
+    final AccountModel? newAccount = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddAccountScreen(
           defaultCurrencyCode: _defaultCurrencyCode,
           userName: _userName,
-        );
-      },
+        ),
+      ),
     );
     
     if (newAccount != null) {
-      try {
-        await _accountRepository.addAccount(newAccount);
+      if (mounted) {
+        setState(() {
+          _accounts.add(newAccount);
+          // Sort again (this would be replaced with orderBy displayOrder later)
+          _accounts.sort((a, b) => a.name.compareTo(b.name));
+        });
         
-        if (mounted) {
-          setState(() {
-            _accounts.add(newAccount);
-            // Sort again (this would be replaced with orderBy displayOrder later)
-            _accounts.sort((a, b) => a.name.compareTo(b.name));
-          });
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${newAccount.name} added successfully'),
-              backgroundColor: ColorConstants.successColor,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error adding account: $e'),
-              backgroundColor: ColorConstants.errorColor,
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${newAccount.name} added successfully'),
+            backgroundColor: ColorConstants.successColor,
+          ),
+        );
       }
     }
   }
@@ -149,32 +167,27 @@ class _AccountsScreenState extends State<AccountsScreen> {
       MaterialPageRoute(
         builder: (context) => AccountDetailsScreen(account: account),
       ),
-    ).then((_) {
-      // Refresh data when returning from details
-      _loadData();
-    });
+    );
+    // No need to reload data here since we're listening to streams
   }
 
   Future<void> _showAddTransactionDialog(AccountModel account) async {
-    final transaction = await showDialog<TransactionModel>(
-      context: context,
-      builder: (BuildContext context) {
-        return AddTransactionDialog(
-          account: account,
-        );
-      },
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddTransactionScreen(account: account),
+      ),
     );
     
-    if (transaction != null) {
-      // Refresh data to update transactions and account balance
-      _loadData();
-      
+    if (result == true) {
+      // Show success message if the transaction was added successfully
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Transaction added successfully'),
           backgroundColor: ColorConstants.successColor,
         ),
       );
+      // No need to manually reload as we're listening to transaction changes
     }
   }
 
@@ -209,43 +222,30 @@ class _AccountsScreenState extends State<AccountsScreen> {
           elevation: 0,
           title: const Text(
             'Accounts',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          backgroundColor: ColorConstants.primaryColor,
-          // If we came from tab navigation, show a home button instead of back
-          leading: fromTab 
-              ? IconButton(
-                  icon: const Icon(Icons.home, color: Colors.white),
-                  onPressed: () {
-                    Navigator.pushReplacementNamed(
-                      context, 
-                      AppRouter.dashboard,
-                      arguments: {'initialTab': 0}
-                    );
-                  },
-                )
-              : IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
           actions: [
+            // Add manual refresh button
             IconButton(
-              icon: const Icon(Icons.search, color: Colors.white),
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh data',
               onPressed: () {
-                // TODO: Implement account search
+                _loadData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Data refreshed'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
               },
             ),
             IconButton(
-              icon: const Icon(Icons.filter_list, color: Colors.white),
-              onPressed: () {
-                // TODO: Implement account filtering
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.settings, color: Colors.white),
-              onPressed: () {
-                Navigator.pushNamed(context, AppRouter.settingsRoute);
-              },
+              icon: const Icon(Icons.add),
+              onPressed: _navigateToAddAccount,
+              tooltip: 'Add Account',
             ),
           ],
         ),
@@ -262,9 +262,81 @@ class _AccountsScreenState extends State<AccountsScreen> {
                     : _buildAccountsList(),
           ),
         ),
-        floatingActionButton: _buildFloatingActionButton(),
+        floatingActionButton: Container(
+          height: 52,
+          width: 52,
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                ColorConstants.primaryColor,
+                ColorConstants.primaryColor.withOpacity(0.8),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: ColorConstants.primaryColor.withOpacity(0.3),
+                blurRadius: 10,
+                spreadRadius: 2,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _navigateToAddAccount,
+              customBorder: const CircleBorder(),
+              child: const Center(
+                child: Icon(
+                  Icons.add,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+            ),
+          ),
+        ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        bottomNavigationBar: _buildBottomNavigationBar(),
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, -5),
+              ),
+            ],
+          ),
+          child: BottomAppBar(
+            shape: const CircularNotchedRectangle(),
+            notchMargin: 8.0,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildNavItem(0, Icons.dashboard_outlined, 'Home', () {
+                    Navigator.pushNamed(context, AppRouter.dashboard);
+                  }),
+                  _buildNavItem(1, Icons.account_balance_wallet_outlined, 'Accounts', () {
+                    // Already on accounts
+                  }),
+                  const SizedBox(width: 40), // Space for FAB
+                  _buildNavItem(2, Icons.category_outlined, 'Categories', () {
+                    Navigator.pushNamed(context, AppRouter.categories);
+                  }),
+                  _buildNavItem(3, Icons.bar_chart_outlined, 'Reports', () {
+                    Navigator.pushNamed(context, AppRouter.reports);
+                  }),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -331,7 +403,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                       ),
                       const SizedBox(height: 32),
                       ElevatedButton(
-                        onPressed: _showAddAccountDialog,
+                        onPressed: _navigateToAddAccount,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: ColorConstants.primaryColor,
                           foregroundColor: Colors.white,
@@ -430,110 +502,81 @@ class _AccountsScreenState extends State<AccountsScreen> {
     final currencySymbol = CurrencyUtils.getCurrencySymbol(_defaultCurrencyCode);
     
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            ColorConstants.primaryColor,
-            ColorConstants.primaryColor.withBlue(220),
-          ],
-        ),
+        color: ColorConstants.primaryColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: ColorConstants.primaryColor.withOpacity(0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: ColorConstants.primaryColor.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Total Balance',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$currencySymbol${totalBalance.toStringAsFixed(2)}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 36,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            height: 6,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: Row(
               children: [
-                const Text(
-                  'Total Balance',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
                 Container(
+                  height: 6,
+                  width: MediaQuery.of(context).size.width * 0.5, // Simplified
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.add,
-                      color: Colors.white,
-                    ),
-                    onPressed: _showAddAccountDialog,
-                    constraints: const BoxConstraints(),
-                    padding: const EdgeInsets.all(8),
+                    color: Colors.greenAccent,
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text(
-              '$currencySymbol${totalBalance.toStringAsFixed(2)}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              height: 6,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(3),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    height: 6,
-                    width: MediaQuery.of(context).size.width * 0.5, // Simplified
-                    decoration: BoxDecoration(
-                      color: Colors.greenAccent,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildBalanceCard(
-                    label: 'Accounts',
-                    value: '${_accounts.length}',
-                    icon: Icons.credit_card,
-                  ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: _buildBalanceCard(
+                  label: 'Accounts',
+                  value: '${_accounts.length}',
+                  icon: Icons.credit_card,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildBalanceCard(
-                    label: 'Active',
-                    value: '${_accounts.where((a) => a.balance > 0).length}',
-                    icon: Icons.check_circle_outline,
-                  ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildBalanceCard(
+                  label: 'Active',
+                  value: '${_accounts.where((a) => a.balance > 0).length}',
+                  icon: Icons.check_circle_outline,
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -544,55 +587,38 @@ class _AccountsScreenState extends State<AccountsScreen> {
     required IconData icon,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: ColorConstants.primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              icon,
-              color: ColorConstants.primaryColor,
-              size: 20,
-            ),
+          Icon(
+            icon,
+            color: Colors.white,
+            size: 20,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 12,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -640,7 +666,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -669,6 +695,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                         height: 48,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
+                          print('Error loading account logo: ${account.bankLogoPath}, error: $error');
                           return _buildAccountIcon(account);
                         },
                       ),
@@ -938,143 +965,6 @@ class _AccountsScreenState extends State<AccountsScreen> {
     }
   }
 
-  Widget _buildBottomNavigationBar() {
-    return Container(
-      height: 65,
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 12,
-            spreadRadius: 1,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          Expanded(child: _buildNavItem(0, Icons.dashboard_outlined, 'Home')),
-          Expanded(child: _buildNavItem(1, Icons.account_balance_wallet_outlined, 'Accounts', isActive: true)),
-          const SizedBox(width: 60), // Space for the FAB
-          Expanded(child: _buildNavItem(2, Icons.category_outlined, 'Categories')),
-          Expanded(child: _buildNavItem(3, Icons.analytics_outlined, 'Reports')),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(int index, IconData icon, String label, {bool isActive = false}) {
-    return InkWell(
-      onTap: () => _onItemTapped(index),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              height: 36,
-              width: 36,
-              decoration: BoxDecoration(
-                color: isActive ? ColorConstants.primaryColor.withOpacity(0.15) : Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 22,
-                color: isActive ? ColorConstants.primaryColor : Colors.grey.shade500,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.0,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                color: isActive ? ColorConstants.primaryColor : Colors.grey.shade500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _onItemTapped(int index) {
-    if (index == 1) return; // Already on accounts tab
-    
-    // Navigate to the appropriate screen based on the selected index
-    switch (index) {
-      case 0: // Dashboard
-        Navigator.pushReplacementNamed(
-          context, 
-          AppRouter.dashboard,
-        );
-        break;
-      case 2: // Categories
-        Navigator.pushReplacementNamed(
-          context, 
-          AppRouter.categories,
-          arguments: {'fromTab': true},
-        );
-        break;
-      case 3: // Reports
-        Navigator.pushReplacementNamed(
-          context, 
-          AppRouter.reports,
-          arguments: {'fromTab': true},
-        );
-        break;
-    }
-  }
-
-  Widget _buildFloatingActionButton() {
-    return Container(
-      height: 56,
-      width: 56,
-      margin: const EdgeInsets.only(bottom: 10), // Adjustment for positioning
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            ColorConstants.primaryColor,
-            ColorConstants.primaryColor.withOpacity(0.8),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: ColorConstants.primaryColor.withOpacity(0.4),
-            blurRadius: 12,
-            spreadRadius: 2,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _showAddAccountDialog,
-          customBorder: const CircleBorder(),
-          child: const Center(
-            child: Icon(
-              Icons.add,
-              color: Colors.white,
-              size: 30,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   String _getTransactionStats(String accountId, TransactionType type) {
     // Calculate the current month's transactions of the given type
     final now = DateTime.now();
@@ -1092,5 +982,37 @@ class _AccountsScreenState extends State<AccountsScreen> {
     }
     
     return CurrencyUtils.formatCompactCurrency(total, currencyCode: _defaultCurrencyCode);
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: index == 1 ? ColorConstants.primaryColor : Colors.grey,
+                size: 22,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: index == 1 ? ColorConstants.primaryColor : Colors.grey,
+                  fontWeight: index == 1 ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 } 

@@ -20,14 +20,16 @@ class AccountTypeAdapter extends TypeAdapter<AccountType> {
       case 2:
         return AccountType.digitalWallet;
       case 3:
-        return AccountType.wallet;
+        return AccountType.card;
       case 4:
-        return AccountType.creditCard;
+        return AccountType.wallet;
       case 5:
-        return AccountType.investment;
+        return AccountType.creditCard;
       case 6:
-        return AccountType.loan;
+        return AccountType.investment;
       case 7:
+        return AccountType.loan;
+      case 8:
         return AccountType.other;
       default:
         return AccountType.bank;
@@ -46,20 +48,23 @@ class AccountTypeAdapter extends TypeAdapter<AccountType> {
       case AccountType.digitalWallet:
         writer.writeByte(2);
         break;
-      case AccountType.wallet:
+      case AccountType.card:
         writer.writeByte(3);
         break;
-      case AccountType.creditCard:
+      case AccountType.wallet:
         writer.writeByte(4);
         break;
-      case AccountType.investment:
+      case AccountType.creditCard:
         writer.writeByte(5);
         break;
-      case AccountType.loan:
+      case AccountType.investment:
         writer.writeByte(6);
         break;
-      case AccountType.other:
+      case AccountType.loan:
         writer.writeByte(7);
+        break;
+      case AccountType.other:
+        writer.writeByte(8);
         break;
     }
   }

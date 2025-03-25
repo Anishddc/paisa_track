@@ -68,25 +68,20 @@ class AccountCard extends StatelessWidget {
                             height: 24,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
+                              print('Error loading bank logo: ${account.bankLogoPath}, error: $error');
                               // Fallback to default icon if image fails to load
-                              return ClipOval(
-                                child: Image.asset(
-                                  'assets/images/app_icon.png',
-                                  width: 24,
-                                  height: 24,
-                                  fit: BoxFit.cover,
-                                ),
+                              return Icon(
+                                account.icon,
+                                color: Color(account.colorValue),
+                                size: 20,
                               );
                             },
                           ),
                         )
-                      : ClipOval(
-                          child: Image.asset(
-                            'assets/images/app_icon.png',
-                            width: 24,
-                            height: 24,
-                            fit: BoxFit.cover,
-                          ),
+                      : Icon(
+                          account.icon,
+                          color: Color(account.colorValue),
+                          size: 20,
                         ),
                   ),
                   const SizedBox(width: 12),

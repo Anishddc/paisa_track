@@ -31,6 +31,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:paisa_track/data/models/app_icon.dart';
 import 'package:paisa_track/data/models/bank_data.dart';
+import 'package:paisa_track/data/repositories/account_repository.dart';
+import 'package:uuid/uuid.dart';
 
 Future<void> main() async {
   // This preserves the splash screen
@@ -69,17 +71,113 @@ Future<void> main() async {
     } catch (e) {
       print('Error initializing Hive: $e');
       
-      // Try to recover by deleting all boxes and starting fresh
-      try {
-        print('Attempting to recover by deleting Hive boxes...');
-        await Hive.initFlutter(); // Make sure Hive is at least initialized
-        _registerHiveAdapters(); // Register adapters again to be sure
-        await _deleteHiveBoxes();
-        firstRun = true;
-        print('Recovery successful, will proceed as first run');
-      } catch (recoveryError) {
-        print('Fatal error during recovery: $recoveryError');
-        throw Exception('Cannot initialize database: $recoveryError');
+      // Check if this is specifically an AccountType issue
+      if (e.toString().contains('AccountType') && e.toString().contains('String')) {
+        print('Detected AccountType conversion issue. Attempting targeted fix...');
+        
+        try {
+          // First make sure Hive is initialized
+          await Hive.initFlutter();
+          _registerHiveAdapters();
+          
+          // Just open the accounts box directly
+          print('Opening accounts box directly to fix type issues...');
+          try {
+            final accountBox = await Hive.openBox<dynamic>(AppConstants.accountsBox);
+            
+            // Loop through each account and fix type issues
+            print('Processing ${accountBox.length} accounts...');
+            for (int i = 0; i < accountBox.length; i++) {
+              try {
+                final account = accountBox.getAt(i);
+                if (account != null) {
+                  // Extract whatever data we can from the corrupted account
+                  Map<String, dynamic> accountData = {};
+                  try {
+                    accountData['id'] = account.id;
+                  } catch (_) {
+                    accountData['id'] = const Uuid().v4();
+                  }
+                  
+                  try {
+                    accountData['name'] = account.name;
+                  } catch (_) {
+                    accountData['name'] = 'Account ${i + 1}';
+                  }
+                  
+                  try {
+                    accountData['balance'] = account.balance;
+                  } catch (_) {
+                    accountData['balance'] = 0.0;
+                  }
+                  
+                  try {
+                    accountData['currency'] = account.currency;
+                  } catch (_) {
+                    accountData['currency'] = null;
+                  }
+                  
+                  // Create a new account with safe string type
+                  final fixedAccount = AccountModel(
+                    id: accountData['id'],
+                    name: accountData['name'],
+                    balance: accountData['balance'] ?? 0.0,
+                    type: 'AccountType.cash', // Safe default
+                    currency: accountData['currency'],
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),
+                  );
+                  
+                  await accountBox.putAt(i, fixedAccount);
+                  print('Fixed account: ${fixedAccount.name}');
+                }
+              } catch (accountError) {
+                print('Error fixing individual account at index $i: $accountError');
+                // Try to delete the problematic account if we can't fix it
+                try {
+                  await accountBox.deleteAt(i);
+                  print('Deleted corrupted account at index $i');
+                } catch (e) {
+                  print('Failed to delete corrupted account: $e');
+                }
+              }
+            }
+            
+            await accountBox.close();
+            print('Account fixes applied. Retrying database initialization...');
+            
+            // Create a new DatabaseService instance to retry initialization
+            final databaseService = DatabaseService();
+            await databaseService.init();
+            print('Database service initialized successfully after targeted fix');
+            
+          } catch (recoveryError) {
+            print('Error during targeted fix: $recoveryError');
+            // If targeted fix fails, fall back to full reset
+            print('Falling back to full reset...');
+            await _deleteHiveBoxes();
+            firstRun = true;
+          }
+        } catch (e) {
+          print('Error during targeted fix: $e');
+          // If targeted fix fails, fall back to full reset
+          print('Falling back to full reset...');
+          await _deleteHiveBoxes();
+          firstRun = true;
+        }
+      } else {
+        // Not an AccountType issue, try standard recovery
+        try {
+          print('Attempting to recover by deleting Hive boxes...');
+          await Hive.initFlutter(); // Make sure Hive is at least initialized
+          _registerHiveAdapters(); // Register adapters again to be sure
+          await _deleteHiveBoxes();
+          firstRun = true;
+          print('Recovery successful, will proceed as first run');
+        } catch (recoveryError) {
+          print('Fatal error during recovery: $recoveryError');
+          throw Exception('Cannot initialize database: $recoveryError');
+        }
       }
     }
     
@@ -144,12 +242,21 @@ Future<void> main() async {
     // Remove splash screen when initialization is done
     FlutterNativeSplash.remove();
     
+    // Initialize singletons/repositories
+    final accountRepository = AccountRepository();
+    final transactionRepository = TransactionRepository();
+    
     runApp(
       MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => ThemeProvider()),
           ChangeNotifierProvider(create: (_) => AuthProvider()..initialize()),
           ChangeNotifierProvider(create: (_) => UserProfileProvider()..initialize()),
+          Provider<UserRepository>(create: (_) => userRepository),
+          Provider<CategoryRepository>(create: (_) => CategoryRepository()),
+          Provider<TransactionRepository>.value(value: transactionRepository),
+          Provider<AccountRepository>.value(value: accountRepository),
+          Provider<BudgetRepository>(create: (_) => BudgetRepository()),
         ],
         child: PaisaTrackApp(initialRoute: initialRoute),
       ),
@@ -193,54 +300,33 @@ Future<void> main() async {
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () async {
-                    // Try to delete all data and restart the app
                     try {
-                      // Clear any registered adapters first
-                      try {
-                        // There's no public API to reset TypeAdapters in Hive,
-                        // but we can force close Hive entirely which has a similar effect
-                        await Hive.close();
-                      } catch (e) {
-                        print('Error closing Hive: $e');
-                        // Continue anyway
-                      }
+                      // First, try to close any open boxes
+                      print('Attempting to reset app data...');
                       
-                      // Initialize Hive again
-                      await Hive.initFlutter();
+                      // Delete all Hive data using our improved method
+                      await _deleteHiveBoxes();
                       
-                      // Delete Hive directory
-                      final appDocDir = await getApplicationDocumentsDirectory();
-                      final hivePath = '${appDocDir.path}/hive';
-                      try {
-                        await Directory(hivePath).delete(recursive: true);
-                        print('Successfully deleted Hive directory');
-                      } catch (e) {
-                        print('Error deleting Hive directory: $e');
-                        // If we can't delete it, we'll skip trying to clear boxes 
-                        // since Hive.boxes API is not available
-                      }
+                      // Clear any preferences
+                      print('Clearing preferences...');
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.clear();
                       
-                      // Also clear shared preferences
-                      await SharedPreferences.getInstance().then((prefs) => prefs.clear());
-                      print('Successfully cleared SharedPreferences');
-                      
-                      // Show success message
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Data cleared successfully. Restarting app...'),
+                          content: Text('App data reset successfully! Restarting app...'),
                           backgroundColor: Colors.green,
                         ),
                       );
                       
-                      // Give UI time to show the message
-                      await Future.delayed(const Duration(seconds: 1));
+                      // Wait a moment to show the success message
+                      await Future.delayed(const Duration(seconds: 2));
                       
-                      // Restart the app (this actually just reruns main())
-                      main();
+                      // Exit the app for a complete restart
+                      // The system will restart the app, which will reinitialize everything
+                      SystemNavigator.pop();
                     } catch (e) {
-                      print('Failed to reset app: $e');
-                      
-                      // Show error message
+                      print('Error resetting app data: $e');
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Failed to reset app: $e'),
@@ -342,18 +428,59 @@ Future<void> _openHiveBoxes() async {
 }
 
 Future<void> _deleteHiveBoxes() async {
-  // Get the Hive directory
-  final appDocDir = await getApplicationDocumentsDirectory();
-  final hivePath = '${appDocDir.path}/hive';
-  
-  // Delete all existing boxes
-  final dir = Directory(hivePath);
-  if (await dir.exists()) {
-    await dir.delete(recursive: true);
+  try {
+    print('Deleting Hive boxes...');
+    
+    // First try to close any open boxes
+    await Hive.close();
+    
+    // Get the Hive directory
+    final appDocDir = await getApplicationDocumentsDirectory();
+    final hivePath = '${appDocDir.path}/hive';
+    
+    // Delete all existing box files manually
+    final dir = Directory(hivePath);
+    if (await dir.exists()) {
+      try {
+        // List all files and directories
+        final entities = dir.listSync();
+        for (final entity in entities) {
+          try {
+            if (entity is File) {
+              await entity.delete();
+              print('Deleted file: ${entity.path}');
+            } else if (entity is Directory) {
+              await entity.delete(recursive: true);
+              print('Deleted directory: ${entity.path}');
+            }
+          } catch (e) {
+            print('Error deleting entity ${entity.path}: $e');
+          }
+        }
+        
+        // Then try to delete the whole directory
+        await dir.delete(recursive: true);
+        print('Deleted main Hive directory');
+      } catch (e) {
+        print('Error while deleting Hive directory contents: $e');
+      }
+    } else {
+      print('Hive directory does not exist, nothing to delete');
+    }
+    
+    // Recreate the directory
+    try {
+      await dir.create(recursive: true);
+      print('Recreated Hive directory');
+    } catch (e) {
+      print('Error recreating Hive directory: $e');
+    }
+    
+    print('Hive boxes deletion completed');
+  } catch (e) {
+    print('Error in _deleteHiveBoxes: $e');
+    // Don't throw here to continue with app initialization
   }
-  
-  // Recreate the directory
-  await dir.create(recursive: true);
 }
 
 /// Handles any data migrations needed when updating the app
@@ -593,41 +720,62 @@ Future<void> _updateExistingAccountLogos() async {
   }
 }
 
-class PaisaTrackApp extends StatelessWidget {
+class PaisaTrackApp extends StatefulWidget {
   final String initialRoute;
   
   const PaisaTrackApp({
-    super.key,
+    Key? key,
     required this.initialRoute,
-  });
+  }) : super(key: key);
 
   @override
+  State<PaisaTrackApp> createState() => _PaisaTrackAppState();
+}
+
+class _PaisaTrackAppState extends State<PaisaTrackApp> {
+  @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        Provider<UserRepository>(
-          create: (_) => UserRepository(),
-        ),
-        Provider<CategoryRepository>(
-          create: (_) => CategoryRepository(),
-        ),
-        Provider<TransactionRepository>(
-          create: (_) => TransactionRepository(),
-        ),
-        Provider<BudgetRepository>(
-          create: (_) => BudgetRepository(),
-        ),
-      ],
-      child: MaterialApp(
-        title: AppConstants.appName,
-        theme: ThemeConstants.lightTheme,
-        darkTheme: ThemeConstants.darkTheme,
-        themeMode: ThemeMode.system,
-        debugShowCheckedModeBanner: false,
-        initialRoute: initialRoute,
-        onGenerateRoute: AppRouter.generateRoute,
-      ),
+    // Using Consumer for ThemeProvider to listen to theme changes
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: AppConstants.appName,
+          theme: themeProvider.lightTheme,
+          darkTheme: themeProvider.darkTheme,
+          themeMode: themeProvider.themeMode,
+          debugShowCheckedModeBanner: false,
+          initialRoute: widget.initialRoute,
+          onGenerateRoute: AppRouter.generateRoute,
+        );
+      },
     );
+  }
+
+  @override
+  void dispose() {
+    try {
+      // Close Hive boxes when app is closed
+      Hive.close();
+      
+      // Get repositories from provider
+      if (context != null) {
+        try {
+          final transactionRepository = Provider.of<TransactionRepository>(context, listen: false);
+          transactionRepository.dispose();
+          
+          final accountRepository = Provider.of<AccountRepository>(context, listen: false);
+          accountRepository.dispose();
+          
+          print('Repositories successfully disposed');
+        } catch (e) {
+          print('Error disposing repositories: $e');
+        }
+      }
+    } catch (e) {
+      print('Error in app disposal: $e');
+    }
+    
+    super.dispose();
   }
 }
 

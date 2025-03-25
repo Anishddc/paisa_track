@@ -143,134 +143,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const Divider(),
                   _buildAboutSection(),
                   const SizedBox(height: 24),
-                  
-                  // Add Check for Updates option
-                  ListTile(
-                    leading: const Icon(Icons.system_update),
-                    title: const Text('Check for Updates'),
-                    subtitle: const Text('Check if a new version is available'),
-                    onTap: () async {
-                      // Show loading indicator
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (BuildContext context) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        },
-                      );
-                      
-                      // Check for updates
-                      await UpdateService.checkForUpdates(context);
-                      
-                      // Hide loading indicator
-                      if (context.mounted) {
-                        Navigator.of(context).pop();
-                      }
-                    },
-                  ),
                 ],
               ),
-        bottomNavigationBar: _buildBottomNavigationBar(),
-      ),
-    );
-  }
-
-  Widget _buildBottomNavigationBar() {
-    return Container(
-      height: 65,
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 12,
-            spreadRadius: 1,
-            offset: const Offset(0, 3),
+        bottomNavigationBar: BottomAppBar(
+          shape: const CircularNotchedRectangle(),
+          notchMargin: 8.0,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.dashboard),
+                onPressed: () {
+                  Navigator.pushNamed(context, AppRouter.dashboard);
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.account_balance_wallet),
+                onPressed: () {
+                  Navigator.pushNamed(context, AppRouter.accounts);
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.category),
+                onPressed: () {
+                  Navigator.pushNamed(context, AppRouter.categories);
+                },
+              ),
+              const SizedBox(width: 40), // Space for FAB
+              IconButton(
+                icon: const Icon(Icons.bar_chart),
+                onPressed: () {
+                  Navigator.pushNamed(context, AppRouter.reports);
+                },
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          Expanded(child: _buildNavItem(0, Icons.dashboard_outlined, 'Home')),
-          Expanded(child: _buildNavItem(1, Icons.account_balance_wallet_outlined, 'Accounts')),
-          const SizedBox(width: 60), // Space for the FAB
-          Expanded(child: _buildNavItem(2, Icons.category_outlined, 'Categories')),
-          Expanded(child: _buildNavItem(3, Icons.analytics_outlined, 'Reports')),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(int index, IconData icon, String label, {bool isActive = false}) {
-    return InkWell(
-      onTap: () => _onItemTapped(index),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              height: 36,
-              width: 36,
-              decoration: BoxDecoration(
-                color: isActive ? ColorConstants.primaryColor.withOpacity(0.15) : Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 22,
-                color: isActive ? ColorConstants.primaryColor : Colors.grey.shade500,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.0,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                color: isActive ? ColorConstants.primaryColor : Colors.grey.shade500,
-              ),
-            ),
-          ],
         ),
       ),
     );
-  }
-
-  void _onItemTapped(int index) {
-    if (index == 3) return; // Already on settings tab
-    
-    // Navigate directly to the appropriate screen based on the selected index
-    switch (index) {
-      case 0: // Dashboard
-        Navigator.pushReplacementNamed(
-          context, 
-          AppRouter.dashboard,
-        );
-        break;
-      case 1: // Accounts
-        Navigator.pushReplacementNamed(
-          context, 
-          AppRouter.accounts,
-          arguments: {'fromTab': true},
-        );
-        break;
-      case 2: // Reports
-        Navigator.pushReplacementNamed(
-          context, 
-          AppRouter.reports,
-          arguments: {'fromTab': true},
-        );
-        break;
-    }
   }
 
   Widget _buildProfileSection() {

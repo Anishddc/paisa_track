@@ -12,35 +12,33 @@ class ReportsScreen extends StatefulWidget {
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProviderStateMixin {
+class _ReportsScreenState extends State<ReportsScreen> with TickerProviderStateMixin {
   late TabController _tabController;
-
+  
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
   }
-
+  
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
-
+  
   @override
   Widget build(BuildContext context) {
-    // Check if we're accessed from the bottom navigation tab
+    // Check if accessed from tab navigation
     final Object? args = ModalRoute.of(context)?.settings.arguments;
     final bool fromTab = args != null && 
-                        args is Map<String, dynamic> && 
-                        args.containsKey('fromTab') && 
-                        args['fromTab'] == true;
+                       args is Map<String, dynamic> && 
+                       args.containsKey('fromTab') && 
+                       args['fromTab'] == true;
     
     return WillPopScope(
-      // Handle back button behavior
       onWillPop: () async {
         if (fromTab) {
-          // Navigate back to dashboard without removing routes from stack
           Navigator.pushReplacementNamed(
             context, 
             AppRouter.dashboard,
@@ -48,158 +46,180 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           );
           return false;
         }
-        // Normal back button behavior for non-tab navigation
         return true;
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Financial Reports'),
-          // If we came from tab navigation, show a home button instead of back
-          leading: fromTab 
-              ? IconButton(
-                  icon: const Icon(Icons.home),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxScrolled) => [
+            SliverAppBar(
+              elevation: 0,
+              pinned: true,
+              floating: true,
+              forceElevated: innerBoxScrolled,
+              backgroundColor: ColorConstants.primaryColor,
+              title: const Text(
+                'Reports',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              leading: fromTab 
+                ? IconButton(
+                    icon: const Icon(Icons.home, color: Colors.white),
+                    onPressed: () {
+                      Navigator.pushReplacementNamed(
+                        context, 
+                        AppRouter.dashboard,
+                        arguments: {'initialTab': 0}
+                      );
+                    },
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.settings, color: Colors.white),
                   onPressed: () {
-                    Navigator.pushReplacementNamed(
-                      context,
-                      AppRouter.dashboard,
-                      arguments: {'initialTab': 0}
-                    );
+                    Navigator.pushNamed(context, AppRouter.settingsRoute);
                   },
-                )
-              : null,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.settings, color: Colors.white),
-              onPressed: () {
-                Navigator.pushNamed(context, AppRouter.settingsRoute);
-              },
+                ),
+              ],
+              expandedHeight: 150.0,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        ColorConstants.primaryColor,
+                        ColorConstants.primaryColor.withOpacity(0.7),
+                      ],
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 80, 16, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Financial Reports',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Track your spending patterns and financial health',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              bottom: TabBar(
+                controller: _tabController,
+                indicatorColor: Colors.white,
+                indicatorWeight: 3,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white.withOpacity(0.7),
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                tabs: const [
+                  Tab(text: 'Budget'),
+                  Tab(text: 'Transactions'),
+                  Tab(text: 'Categories'),
+                ],
+              ),
             ),
           ],
-          bottom: TabBar(
+          body: TabBarView(
             controller: _tabController,
-            indicatorColor: ColorConstants.primaryColor,
-            tabs: const [
-              Tab(
-                icon: Icon(Icons.account_balance_wallet),
-                text: 'Budget',
-              ),
-              Tab(
-                icon: Icon(Icons.swap_horiz),
-                text: 'Transactions',
-              ),
-              Tab(
-                icon: Icon(Icons.category),
-                text: 'Categories',
-              ),
+            children: const [
+              BudgetReportTab(),
+              TransactionReportTab(),
+              CategoryReportTab(),
             ],
           ),
         ),
-        body: TabBarView(
-          controller: _tabController,
-          children: const [
-            BudgetReportTab(),
-            TransactionReportTab(),
-            CategoryReportTab(),
-          ],
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () {
+            Navigator.pushNamed(context, AppRouter.addTransaction);
+          },
+          backgroundColor: ColorConstants.accentColor,
+          icon: const Icon(Icons.add),
+          label: const Text('Add Transaction'),
         ),
-        bottomNavigationBar: _buildBottomNavigationBar(),
+        bottomNavigationBar: fromTab 
+          ? BottomAppBar(
+              height: 60,
+              color: Colors.white,
+              elevation: 8,
+              notchMargin: 6,
+              shape: const CircularNotchedRectangle(),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildBottomNavItem(
+                    icon: Icons.category,
+                    label: 'Categories',
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context, 
+                        AppRouter.categories,
+                        arguments: {'fromTab': true}
+                      );
+                    }
+                  ),
+                  const SizedBox(width: 48),
+                  _buildBottomNavItem(
+                    icon: Icons.settings,
+                    label: 'Settings',
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context, 
+                        AppRouter.settingsRoute,
+                        arguments: {'fromTab': true}
+                      );
+                    }
+                  ),
+                ],
+              ),
+            )
+          : null,
       ),
     );
   }
-
-  Widget _buildBottomNavigationBar() {
-    return Container(
-      height: 65,
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 12,
-            spreadRadius: 1,
-            offset: const Offset(0, 3),
+  
+  Widget _buildBottomNavItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: ColorConstants.primaryColor),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: ColorConstants.primaryColor,
+            ),
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          Expanded(child: _buildNavItem(0, Icons.dashboard_outlined, 'Home')),
-          Expanded(child: _buildNavItem(1, Icons.account_balance_wallet_outlined, 'Accounts')),
-          const SizedBox(width: 60), // Space for the FAB
-          Expanded(child: _buildNavItem(2, Icons.category_outlined, 'Categories')),
-          Expanded(child: _buildNavItem(3, Icons.analytics_outlined, 'Reports', isActive: true)),
-        ],
-      ),
     );
-  }
-
-  Widget _buildNavItem(int index, IconData icon, String label, {bool isActive = false}) {
-    return InkWell(
-      onTap: () => _onItemTapped(index),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              height: 36,
-              width: 36,
-              decoration: BoxDecoration(
-                color: isActive ? ColorConstants.primaryColor.withOpacity(0.15) : Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 22,
-                color: isActive ? ColorConstants.primaryColor : Colors.grey.shade500,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.0,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                color: isActive ? ColorConstants.primaryColor : Colors.grey.shade500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _onItemTapped(int index) {
-    if (index == 3) return; // Already on reports tab
-    
-    // Navigate directly to the appropriate screen based on the selected index
-    switch (index) {
-      case 0: // Dashboard
-        Navigator.pushReplacementNamed(
-          context, 
-          AppRouter.dashboard,
-        );
-        break;
-      case 1: // Accounts
-        Navigator.pushReplacementNamed(
-          context, 
-          AppRouter.accounts,
-          arguments: {'fromTab': true},
-        );
-        break;
-      case 2: // Categories
-        Navigator.pushReplacementNamed(
-          context, 
-          AppRouter.categories,
-          arguments: {'fromTab': true},
-        );
-        break;
-    }
   }
 } 

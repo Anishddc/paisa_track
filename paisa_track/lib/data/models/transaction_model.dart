@@ -153,4 +153,20 @@ class TransactionModel extends HiveObject {
       isProcessed: json['isProcessed'] ?? false,
     );
   }
+
+  Future<void> save() async {
+    try {
+      // Get the box and save this transaction
+      final box = await Hive.openBox<TransactionModel>('transactions');
+      await box.put(id, this);
+      
+      print('Transaction saved: $id (${description ?? "no description"})');
+      
+      // Note: This doesn't automatically notify listeners
+      // The repository's stream controller needs to be triggered separately
+    } catch (e) {
+      print('Error saving transaction: $e');
+      rethrow;
+    }
+  }
 } 

@@ -19,7 +19,7 @@ class AccountModel extends HiveObject {
   final double balance;
   
   @HiveField(3)
-  final AccountType type;
+  final String _typeString;
   
   @HiveField(4)
   final CurrencyType currency;
@@ -54,13 +54,83 @@ class AccountModel extends HiveObject {
   @HiveField(14)
   final String? bankLogoPath;
   
+  @HiveField(15)
+  final double initialBalance;
+  
+  @HiveField(16)
+  final String? userName;
+  
   static const IconData defaultIcon = Icons.account_balance;  // Make this constant
+  
+  // Convert AccountType to String for storage
+  String _accountTypeToString(AccountType type) {
+    return type.toString();
+  }
+  
+  // Convert String to AccountType
+  static AccountType _stringToAccountType(dynamic typeInput) {
+    try {
+      // If it's already an AccountType enum, return it directly
+      if (typeInput is AccountType) {
+        return typeInput;
+      }
+      
+      // Convert to string to handle various input formats
+      final typeString = typeInput.toString();
+      
+      // Handle full enum path names
+      if (typeString == 'AccountType.bank') return AccountType.bank;
+      if (typeString == 'AccountType.cash') return AccountType.cash;
+      if (typeString == 'AccountType.digitalWallet') return AccountType.digitalWallet;
+      if (typeString == 'AccountType.card') return AccountType.card;
+      if (typeString == 'AccountType.wallet') return AccountType.wallet;
+      if (typeString == 'AccountType.creditCard') return AccountType.creditCard;
+      if (typeString == 'AccountType.investment') return AccountType.investment;
+      if (typeString == 'AccountType.loan') return AccountType.loan;
+      if (typeString == 'AccountType.other') return AccountType.other;
+      
+      // Handle simple enum value names
+      if (typeString == 'bank') return AccountType.bank;
+      if (typeString == 'cash') return AccountType.cash;
+      if (typeString == 'digitalWallet') return AccountType.digitalWallet;
+      if (typeString == 'card') return AccountType.card;
+      if (typeString == 'wallet') return AccountType.wallet;
+      if (typeString == 'creditCard') return AccountType.creditCard;
+      if (typeString == 'investment') return AccountType.investment;
+      if (typeString == 'loan') return AccountType.loan;
+      if (typeString == 'other') return AccountType.other;
+      
+      // Try to match by enum value name or full toString() representation
+      return AccountType.values.firstWhere(
+        (e) => e.toString() == typeString || e.name == typeString,
+        orElse: () => AccountType.cash,
+      );
+    } catch (_) {
+      return AccountType.cash;
+    }
+  }
+  
+  // Getter to access AccountType
+  AccountType get type {
+    try {
+      // Handle the case where _typeString might actually be an AccountType enum
+      if (_typeString is AccountType) {
+        return _typeString as AccountType;
+      }
+      
+      // Otherwise, convert from string
+      return _stringToAccountType(_typeString);
+    } catch (_) {
+      // Fallback to safe default
+      return AccountType.cash;
+    }
+  }
   
   AccountModel({
     String? id,
     required this.name,
     this.balance = 0.0,
-    required this.type,
+    Object? type, // Accept any type for flexibility
     CurrencyType? currency,
     String? currencyCode,
     this.description,
@@ -74,10 +144,19 @@ class AccountModel extends HiveObject {
     this.iconData,
     IconData? icon,
     this.bankLogoPath,
+    double? initialBalance,
+    this.userName,
   }) : id = id ?? const Uuid().v4(),
+       // Handle different type parameters - now with more robust handling
+       _typeString = type is AccountType 
+           ? type.toString() 
+           : (type is String 
+               ? type 
+               : AccountType.cash.toString()),
        currency = currency ?? (currencyCode != null ? CurrencyType.fromCode(currencyCode) : CurrencyType.usd),
        createdAt = createdAt ?? DateTime.now(),
-       updatedAt = updatedAt ?? DateTime.now();
+       updatedAt = updatedAt ?? DateTime.now(),
+       initialBalance = initialBalance ?? balance;
   
   // Backward compatibility getters
   String get currencyCode => currency.name;
@@ -121,7 +200,7 @@ class AccountModel extends HiveObject {
   AccountModel copyWith({
     String? name,
     double? balance,
-    AccountType? type,
+    Object? type,
     CurrencyType? currency,
     String? description,
     bool? isArchived,
@@ -132,6 +211,8 @@ class AccountModel extends HiveObject {
     String? accountHolderName,
     int? iconData,
     String? bankLogoPath,
+    double? initialBalance,
+    String? userName,
   }) {
     return AccountModel(
       id: id,
@@ -149,6 +230,8 @@ class AccountModel extends HiveObject {
       accountHolderName: accountHolderName ?? this.accountHolderName,
       iconData: iconData ?? this.iconData,
       bankLogoPath: bankLogoPath ?? this.bankLogoPath,
+      initialBalance: initialBalance ?? this.initialBalance,
+      userName: userName ?? this.userName,
     );
   }
   
@@ -157,7 +240,7 @@ class AccountModel extends HiveObject {
       'id': id,
       'name': name,
       'balance': balance,
-      'type': type.toString(),
+      'type': _typeString,
       'currency': currency.toString(),
       'description': description,
       'createdAt': createdAt.toIso8601String(),
@@ -169,18 +252,18 @@ class AccountModel extends HiveObject {
       'accountHolderName': accountHolderName,
       'iconData': iconData,
       'bankLogoPath': bankLogoPath,
+      'initialBalance': initialBalance,
+      'userName': userName,
     };
   }
   
   factory AccountModel.fromJson(Map<String, dynamic> json) {
+    // Type handling is done in the constructor
     return AccountModel(
       id: json['id'],
       name: json['name'],
       balance: json['balance'].toDouble(),
-      type: AccountType.values.firstWhere(
-        (e) => e.toString() == json['type'],
-        orElse: () => AccountType.cash,
-      ),
+      type: json['type'],
       currency: CurrencyType.values.firstWhere(
         (e) => e.toString() == json['currency'],
         orElse: () => CurrencyType.usd,
@@ -195,6 +278,8 @@ class AccountModel extends HiveObject {
       accountHolderName: json['accountHolderName'],
       iconData: json['iconData'],
       bankLogoPath: json['bankLogoPath'],
+      initialBalance: json['initialBalance']?.toDouble(),
+      userName: json['userName'],
     );
   }
 } 

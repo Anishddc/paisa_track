@@ -16,18 +16,21 @@ enum AccountType {
   digitalWallet,
   
   @HiveField(3)
-  wallet,
+  card,
   
   @HiveField(4)
-  creditCard,
+  wallet,
   
   @HiveField(5)
-  investment,
+  creditCard,
   
   @HiveField(6)
-  loan,
+  investment,
   
   @HiveField(7)
+  loan,
+  
+  @HiveField(8)
   other,
 }
 
@@ -40,6 +43,8 @@ extension AccountTypeExtension on AccountType {
         return 'Cash';
       case AccountType.digitalWallet:
         return 'Digital Wallet';
+      case AccountType.card:
+        return 'Card';
       case AccountType.wallet:
         return 'Wallet';
       case AccountType.creditCard:
@@ -61,6 +66,8 @@ extension AccountTypeExtension on AccountType {
         return Icons.money;
       case AccountType.digitalWallet:
         return Icons.account_balance_wallet;
+      case AccountType.card:
+        return Icons.credit_card;
       case AccountType.wallet:
         return Icons.wallet;
       case AccountType.creditCard:
@@ -82,6 +89,8 @@ extension AccountTypeExtension on AccountType {
         return Colors.green;
       case AccountType.digitalWallet:
         return Colors.purple;
+      case AccountType.card:
+        return Colors.orange.shade800;
       case AccountType.wallet:
         return Colors.orange;
       case AccountType.creditCard:

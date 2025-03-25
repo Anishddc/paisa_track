@@ -27,27 +27,27 @@ class _CategoryReportTabState extends State<CategoryReportTab> {
   Map<String, double> _categorySpending = {};
   
   // Date range
-  DateTime _startDate = DateTime.now();
-  DateTime _endDate = DateTime.now();
+  DateTime _startDate = DateTime.now().copyWith(day: 1);
+  DateTime _endDate = DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
   
   @override
   void initState() {
     super.initState();
-    // Initialize date range to current month
-    final now = DateTime.now();
-    _startDate = DateTime(now.year, now.month, 1);
-    _endDate = DateTime(now.year, now.month + 1, 0);
   }
   
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    
+    // Get repository instances
     _categoryRepository = Provider.of<CategoryRepository>(context, listen: false);
     _transactionRepository = Provider.of<TransactionRepository>(context, listen: false);
+    
+    // Initial data load
     _loadData();
   }
   
-  void _loadData() async {
+  Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
     });
@@ -71,7 +71,7 @@ class _CategoryReportTabState extends State<CategoryReportTab> {
       if (_selectedTab == 'Expense') {
         _transactions = _transactions.where((t) => t.isExpense).toList();
       } else {
-        _transactions = _transactions.where((t) => !t.isExpense).toList();
+        _transactions = _transactions.where((t) => t.isIncome).toList();
       }
       
       // Calculate spending by category
@@ -126,124 +126,196 @@ class _CategoryReportTabState extends State<CategoryReportTab> {
   
   @override
   Widget build(BuildContext context) {
-    return _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : RefreshIndicator(
-            onRefresh: () async {
-              _loadData();
-            },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildDateRangePicker(),
-                    const SizedBox(height: 16),
-                    _buildTabSelector(),
-                    const SizedBox(height: 16),
-                    _buildCategorySummary(),
-                    const SizedBox(height: 16),
-                    _buildCategoryPieChart(),
-                    const SizedBox(height: 16),
-                    _buildCategoryBreakdown(),
-                  ],
+    return StreamBuilder<void>(
+      stream: _transactionRepository.transactionsChanged,
+      builder: (context, snapshot) {
+        // Reload data when stream emits an event
+        if (snapshot.connectionState == ConnectionState.active) {
+          // Load data on a slight delay to ensure Hive has completed its operation
+          Future.microtask(() => _loadData());
+        }
+        
+        return _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: () async {
+                  _loadData();
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildDateSelector(),
+                        const SizedBox(height: 16),
+                        _buildTabSelector(),
+                        const SizedBox(height: 16),
+                        _buildCategorySummary(),
+                        const SizedBox(height: 16),
+                        _buildCategoryPieChart(),
+                        const SizedBox(height: 16),
+                        _buildCategoryBreakdown(),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          );
+              );
+      },
+    );
   }
   
-  Widget _buildDateRangePicker() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Select Time Period',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+  Widget _buildDateSelector() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Select Time Period',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: _selectDateRange,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.grey.shade300,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    color: ColorConstants.primaryColor,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '${DateFormat('MMM d, y').format(_startDate)} - ${DateFormat('MMM d, y').format(_endDate)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(DateFormat('MMM dd, yyyy').format(_startDate)),
-                    onPressed: () => _selectDate(true),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                const Text('to'),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(DateFormat('MMM dd, yyyy').format(_endDate)),
-                    onPressed: () => _selectDate(false),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildQuickDateButton('This Month', () => _setThisMonth()),
-                _buildQuickDateButton('Last Month', () => _setLastMonth()),
-                _buildQuickDateButton('Last 3 Months', () => _setLastNMonths(3)),
-                _buildQuickDateButton('Year to Date', () => _setYearToDate()),
-              ],
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildQuickDateButton('This Month', () => _setThisMonth()),
+              _buildQuickDateButton('Last Month', () => _setLastMonth()),
+              _buildQuickDateButton('Year to Date', () => _setYearToDate()),
+            ],
+          ),
+        ],
       ),
     );
   }
   
   Widget _buildTabSelector() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Category Type',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Category Type',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment<String>(
-                  value: 'Expense', 
-                  label: Text('Expense'),
-                  icon: Icon(Icons.arrow_downward),
-                ),
-                ButtonSegment<String>(
-                  value: 'Income', 
-                  label: Text('Income'),
-                  icon: Icon(Icons.arrow_upward),
-                ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                _buildTabButton('Expense', Icons.arrow_downward, Colors.red),
+                _buildTabButton('Income', Icons.arrow_upward, Colors.green),
               ],
-              selected: {_selectedTab},
-              onSelectionChanged: (Set<String> selection) {
-                setState(() {
-                  _selectedTab = selection.first;
-                  _loadData(); // Reload data for the selected tab
-                });
-              },
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildTabButton(String label, IconData icon, Color color) {
+    final bool isSelected = _selectedTab == label;
+    
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedTab = label;
+            _loadData(); // Reload data for the selected tab
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? ColorConstants.primaryColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? Colors.white : color,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.grey.shade800,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -264,29 +336,38 @@ class _CategoryReportTabState extends State<CategoryReportTab> {
     );
   }
   
-  Future<void> _selectDate(bool isStartDate) async {
-    final DateTime? picked = await showDatePicker(
+  Future<void> _selectDateRange() async {
+    final DateTimeRange? pickedRange = await showDateRangePicker(
       context: context,
-      initialDate: isStartDate ? _startDate : _endDate,
+      initialDateRange: DateTimeRange(
+        start: _startDate,
+        end: _endDate,
+      ),
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: ColorConstants.primaryColor,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: ColorConstants.primaryColor,
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
-    
-    if (picked != null) {
+
+    if (pickedRange != null) {
       setState(() {
-        if (isStartDate) {
-          _startDate = picked;
-          // Ensure end date is not before start date
-          if (_endDate.isBefore(_startDate)) {
-            _endDate = _startDate.add(const Duration(days: 1));
-          }
-        } else {
-          _endDate = picked;
-          // Ensure start date is not after end date
-          if (_startDate.isAfter(_endDate)) {
-            _startDate = _endDate.subtract(const Duration(days: 1));
-          }
-        }
+        _startDate = pickedRange.start;
+        _endDate = pickedRange.end;
       });
       _loadData();
     }
@@ -310,20 +391,11 @@ class _CategoryReportTabState extends State<CategoryReportTab> {
     _loadData();
   }
   
-  void _setLastNMonths(int months) {
-    final now = DateTime.now();
-    setState(() {
-      _startDate = DateTime(now.year, now.month - (months - 1), 1);
-      _endDate = DateTime(now.year, now.month + 1, 0);
-    });
-    _loadData();
-  }
-  
   void _setYearToDate() {
     final now = DateTime.now();
     setState(() {
       _startDate = DateTime(now.year, 1, 1);
-      _endDate = DateTime(now.year, now.month + 1, 0);
+      _endDate = DateTime(now.year, now.month, now.day);
     });
     _loadData();
   }
@@ -333,45 +405,53 @@ class _CategoryReportTabState extends State<CategoryReportTab> {
     final totalAmount = _getTotalAmount();
     final categoryCount = _categorySpending.length;
     
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${_selectedTab} Summary',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${_selectedTab} Summary',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildSummaryItem(
+                'Total ${_selectedTab}',
+                currencyFormat.format(totalAmount),
+                _selectedTab == 'Expense' ? Icons.shopping_cart : Icons.account_balance_wallet,
+                _selectedTab == 'Expense' ? ColorConstants.errorColor : ColorConstants.successColor,
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildSummaryItem(
-                  'Total ${_selectedTab}',
-                  currencyFormat.format(totalAmount),
-                  _selectedTab == 'Expense' ? Icons.shopping_cart : Icons.account_balance_wallet,
-                  _selectedTab == 'Expense' ? ColorConstants.errorColor : ColorConstants.successColor,
-                ),
-                _buildSummaryItem(
-                  'Categories Used',
-                  categoryCount.toString(),
-                  Icons.category,
-                  ColorConstants.primaryColor,
-                ),
-                _buildSummaryItem(
-                  'Transactions',
-                  _transactions.length.toString(),
-                  Icons.receipt_long,
-                  Colors.purple,
-                ),
-              ],
-            ),
-          ],
-        ),
+              _buildSummaryItem(
+                'Categories Used',
+                categoryCount.toString(),
+                Icons.category,
+                ColorConstants.primaryColor,
+              ),
+              _buildSummaryItem(
+                'Transactions',
+                _transactions.length.toString(),
+                Icons.receipt_long,
+                Colors.purple,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -379,28 +459,32 @@ class _CategoryReportTabState extends State<CategoryReportTab> {
   Widget _buildSummaryItem(String label, String value, IconData icon, Color color) {
     return Column(
       children: [
-        CircleAvatar(
-          radius: 20,
-          backgroundColor: color.withOpacity(0.2),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
           child: Icon(
             icon,
             color: color,
-            size: 20,
+            size: 22,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
+            color: color,
           ),
         ),
         Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: Colors.grey.shade600,
           ),
         ),
       ],
@@ -409,14 +493,36 @@ class _CategoryReportTabState extends State<CategoryReportTab> {
   
   Widget _buildCategoryPieChart() {
     if (_categorySpending.isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Center(
-            child: Text(
-              'No data available for this period.',
-              style: TextStyle(color: Colors.grey),
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
+          ],
+        ),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                _selectedTab == 'Expense' ? Icons.shopping_cart_outlined : Icons.account_balance_wallet_outlined,
+                size: 48,
+                color: Colors.grey.shade300,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No ${_selectedTab.toLowerCase()} data available for this period',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -424,47 +530,56 @@ class _CategoryReportTabState extends State<CategoryReportTab> {
     
     final totalAmount = _getTotalAmount();
     
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${_selectedTab} by Category',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${_selectedTab} by Category',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 200,
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: PieChart(
-                      PieChartData(
-                        sections: _getPieSections(totalAmount),
-                        centerSpaceRadius: 40,
-                        sectionsSpace: 2,
-                        pieTouchData: PieTouchData(
-                          enabled: true,
-                          touchCallback: (_, pieTouchResponse) {},
-                        ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 240,
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: PieChart(
+                    PieChartData(
+                      sections: _getPieSections(totalAmount),
+                      centerSpaceRadius: 40,
+                      sectionsSpace: 2,
+                      pieTouchData: PieTouchData(
+                        enabled: true,
+                        touchCallback: (_, pieTouchResponse) {},
                       ),
                     ),
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: _buildPieLegend(totalAmount),
-                  ),
-                ],
-              ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: _buildPieLegend(totalAmount),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -483,7 +598,7 @@ class _CategoryReportTabState extends State<CategoryReportTab> {
         color: _getCategoryColor(entry.key),
         value: entry.value,
         title: '${percentage.toStringAsFixed(0)}%',
-        radius: 50,
+        radius: 80,
         titleStyle: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
@@ -509,13 +624,16 @@ class _CategoryReportTabState extends State<CategoryReportTab> {
       children: topCategories.map((entry) {
         final percentage = (entry.value / totalAmount) * 100;
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: Row(
             children: [
               Container(
                 width: 12,
                 height: 12,
-                color: _getCategoryColor(entry.key),
+                decoration: BoxDecoration(
+                  color: _getCategoryColor(entry.key),
+                  shape: BoxShape.circle,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -548,106 +666,119 @@ class _CategoryReportTabState extends State<CategoryReportTab> {
     final totalAmount = _getTotalAmount();
     final currencyFormat = NumberFormat.currency(symbol: '\$');
     
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${_selectedTab} Categories Breakdown',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${_selectedTab} Categories Breakdown',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 16),
-            ...sortedCategories.map((entry) {
+          ),
+          const SizedBox(height: 16),
+          ListView.separated(
+            physics: const NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
+            itemCount: sortedCategories.length,
+            separatorBuilder: (context, index) => const Divider(height: 24),
+            itemBuilder: (context, index) {
+              final entry = sortedCategories[index];
               final percentage = (entry.value / totalAmount) * 100;
               final transactionCount = _transactions
                   .where((t) => t.categoryId == entry.key)
                   .length;
               
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: _getCategoryColor(entry.key).withOpacity(0.2),
-                          child: Icon(
-                            _getCategoryIcon(entry.key),
-                            color: _getCategoryColor(entry.key),
-                            size: 16,
-                          ),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _getCategoryColor(entry.key).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _getCategoryName(entry.key),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                '$transactionCount transactions',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
+                        child: Icon(
+                          _getCategoryIcon(entry.key),
+                          color: _getCategoryColor(entry.key),
+                          size: 16,
                         ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              currencyFormat.format(entry.value),
+                              _getCategoryName(entry.key),
                               style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
                               ),
                             ),
                             Text(
-                              '${percentage.toStringAsFixed(1)}%',
+                              '$transactionCount transactions',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey[600],
+                                color: Colors.grey.shade600,
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    LinearProgressIndicator(
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            currencyFormat.format(entry.value),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _selectedTab == 'Expense' 
+                                  ? Colors.red.shade600 
+                                  : Colors.green.shade600,
+                            ),
+                          ),
+                          Text(
+                            '${percentage.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
                       value: percentage / 100,
-                      backgroundColor: Colors.grey[200],
+                      backgroundColor: Colors.grey.shade200,
                       valueColor: AlwaysStoppedAnimation<Color>(_getCategoryColor(entry.key)),
-                      minHeight: 6,
-                      borderRadius: BorderRadius.circular(3),
+                      minHeight: 5,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               );
-            }).toList(),
-            const SizedBox(height: 16),
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pushNamed('/categories');
-                },
-                child: const Text('Manage Categories'),
-              ),
-            ),
-          ],
-        ),
+            },
+          ),
+        ],
       ),
     );
   }

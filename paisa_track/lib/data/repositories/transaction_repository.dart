@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:paisa_track/core/utils/date_utils.dart' as app_date_utils;
 import 'package:paisa_track/data/models/account_model.dart';
 import 'package:paisa_track/data/models/enums/transaction_type.dart';
@@ -11,10 +13,32 @@ class TransactionRepository {
   final AccountRepository _accountRepository = AccountRepository();
   static const String _boxName = 'transactions';
   
+  // Create a broadcast stream controller that can be listened to multiple times
+  final StreamController<void> _transactionsChangedController = StreamController<void>.broadcast();
+  
+  // Stream that emits an event whenever transactions change
+  Stream<void> get transactionsChanged => _transactionsChangedController.stream;
+  
+  // Trigger the stream to notify listeners
+  void notifyListeners() {
+    if (!_transactionsChangedController.isClosed) {
+      // Add a event to the stream to notify listeners
+      _transactionsChangedController.add(null);
+      print('Transaction stream notified! Listeners should update now.');
+    }
+  }
+  
   // Get all transactions
   List<TransactionModel> getAllTransactions() {
-    final transactionBox = _databaseService.transactionsBox;
-    return transactionBox.values.toList();
+    try {
+      final transactionBox = _databaseService.transactionsBox;
+      final transactions = transactionBox.values.toList();
+      print('Fetched ${transactions.length} transactions from Hive');
+      return transactions;
+    } catch (e) {
+      debugPrint('Error fetching transactions: $e');
+      return [];
+    }
   }
   
   // Get all transactions sorted by date (newest first)
@@ -47,11 +71,7 @@ class TransactionRepository {
   
   // Get transactions by date range
   List<TransactionModel> getTransactionsByDateRange(DateTime start, DateTime end) {
-    final transactions = getAllTransactions();
-    return transactions.where((tx) => 
-      (tx.date.isAfter(start) || tx.date.isAtSameMomentAs(start)) &&
-      (tx.date.isBefore(end) || tx.date.isAtSameMomentAs(end))
-    ).toList();
+    return getTransactionsInRange(start, end);
   }
   
   // Get transactions for today
@@ -101,41 +121,141 @@ class TransactionRepository {
     return transactionBox.get(id);
   }
   
+  // Get transactions within a date range
+  List<TransactionModel> getTransactionsInRange(DateTime start, DateTime end) {
+    final transactions = getAllTransactions();
+    return transactions.where((tx) => 
+      (tx.date.isAfter(start.subtract(const Duration(days: 1))) || tx.date.isAtSameMomentAs(start)) &&
+      (tx.date.isBefore(end.add(const Duration(days: 1))) || tx.date.isAtSameMomentAs(end))
+    ).toList();
+  }
+  
+  // Check for unprocessed transactions in the last 24 hours
+  Future<bool> hasUnprocessedTransactions() async {
+    final box = await Hive.openBox<TransactionModel>(_boxName);
+    final yesterday = DateTime.now().subtract(Duration(days: 1));
+    
+    return box.values.any((transaction) => 
+      transaction.date.isAfter(yesterday) && 
+      !transaction.isProcessed
+    );
+  }
+  
+  // Mark transactions as processed
+  Future<void> markTransactionsAsProcessed() async {
+    try {
+      final box = await Hive.openBox<TransactionModel>(_boxName);
+      final yesterday = DateTime.now().subtract(Duration(days: 1));
+      
+      final unprocessedTransactions = box.values.where((transaction) => 
+        transaction.date.isAfter(yesterday) && 
+        !transaction.isProcessed
+      ).toList();
+      
+      if (unprocessedTransactions.isEmpty) {
+        debugPrint('No unprocessed transactions found');
+        return;
+      }
+      
+      debugPrint('Marking ${unprocessedTransactions.length} transactions as processed');
+      
+      for (var transaction in unprocessedTransactions) {
+        transaction.isProcessed = true;
+        await transaction.save();
+      }
+      
+      // Notify listeners that transactions have changed
+      notifyListeners();
+      
+      debugPrint('All unprocessed transactions marked as processed');
+    } catch (e) {
+      debugPrint('Error marking transactions as processed: $e');
+      rethrow;
+    }
+  }
+  
   // Add new transaction
   Future<void> addTransaction(TransactionModel transaction) async {
-    final transactionBox = _databaseService.transactionsBox;
-    
-    // Update account balances
-    await _updateAccountBalances(transaction);
-    
-    // Save the transaction
-    await transactionBox.put(transaction.id, transaction);
+    try {
+      final transactionBox = _databaseService.transactionsBox;
+      
+      // Update account balances
+      await _updateAccountBalances(transaction);
+      
+      // Save the transaction
+      await transactionBox.put(transaction.id, transaction);
+      
+      // Force an immediate UI refresh across the app
+      notifyListeners();
+      
+      // Notify account listeners explicitly
+      try {
+        // Manually trigger the account repository to update the UI
+        final accountRepo = _accountRepository;
+        accountRepo.notifyListeners();
+      } catch (e) {
+        debugPrint('Error notifying account repository: $e');
+      }
+      
+      // Make sure changes are flushed to disk
+      await transactionBox.flush();
+      
+      // Print for debugging
+      debugPrint('Transaction added: ${transaction.id}, amount: ${transaction.amount}');
+      debugPrint('UI refresh notifications sent');
+    } catch (e) {
+      debugPrint('Error adding transaction: $e');
+      // Rethrow the error for higher-level handling
+      rethrow;
+    }
   }
   
   // Update transaction
   Future<void> updateTransaction(TransactionModel oldTransaction, TransactionModel newTransaction) async {
-    final transactionBox = _databaseService.transactionsBox;
-    
-    // First revert the old transaction's effect on account balances
-    await _revertAccountBalances(oldTransaction);
-    
-    // Then apply the new transaction's effect
-    await _updateAccountBalances(newTransaction);
-    
-    // Save the updated transaction
-    await transactionBox.put(newTransaction.id, newTransaction);
+    try {
+      final transactionBox = _databaseService.transactionsBox;
+      
+      // First revert the old transaction's effect on account balances
+      await _revertAccountBalances(oldTransaction);
+      
+      // Then apply the new transaction's effect
+      await _updateAccountBalances(newTransaction);
+      
+      // Save the updated transaction
+      await transactionBox.put(newTransaction.id, newTransaction);
+      
+      // Notify listeners
+      notifyListeners();
+      
+      debugPrint('Transaction updated: ${newTransaction.id}');
+    } catch (e) {
+      debugPrint('Error updating transaction: $e');
+      // Rethrow the error for higher-level handling
+      rethrow;
+    }
   }
   
   // Delete transaction
   Future<void> deleteTransaction(String id) async {
-    final transaction = getTransactionById(id);
-    if (transaction != null) {
-      // Revert the transaction's effect on account balances
-      await _revertAccountBalances(transaction);
-      
-      // Delete the transaction
-      final transactionBox = _databaseService.transactionsBox;
-      await transactionBox.delete(id);
+    try {
+      final transaction = getTransactionById(id);
+      if (transaction != null) {
+        // Revert the transaction's effect on account balances
+        await _revertAccountBalances(transaction);
+        
+        // Delete the transaction
+        final transactionBox = _databaseService.transactionsBox;
+        await transactionBox.delete(id);
+        
+        // Notify listeners
+        notifyListeners();
+        
+        debugPrint('Transaction deleted: $id');
+      }
+    } catch (e) {
+      debugPrint('Error deleting transaction: $e');
+      // Rethrow the error for higher-level handling
+      rethrow;
     }
   }
   
@@ -253,40 +373,14 @@ class TransactionRepository {
     }
   }
   
-  // Get transactions within a date range
-  List<TransactionModel> getTransactionsInRange(DateTime startDate, DateTime endDate) {
-    final transactionBox = _databaseService.transactionsBox;
-    return transactionBox.values
-        .where((transaction) => 
-            transaction.date.isAfter(startDate.subtract(const Duration(days: 1))) && 
-            transaction.date.isBefore(endDate.add(const Duration(days: 1))))
-        .toList();
-  }
-  
-  // Check for unprocessed transactions in the last 24 hours
-  Future<bool> hasUnprocessedTransactions() async {
-    final box = await Hive.openBox<TransactionModel>(_boxName);
-    final yesterday = DateTime.now().subtract(Duration(days: 1));
-    
-    return box.values.any((transaction) => 
-      transaction.date.isAfter(yesterday) && 
-      !transaction.isProcessed
-    );
-  }
-  
-  // Mark transactions as processed
-  Future<void> markTransactionsAsProcessed() async {
-    final box = await Hive.openBox<TransactionModel>(_boxName);
-    final yesterday = DateTime.now().subtract(Duration(days: 1));
-    
-    final unprocessedTransactions = box.values.where((transaction) => 
-      transaction.date.isAfter(yesterday) && 
-      !transaction.isProcessed
-    ).toList();
-    
-    for (var transaction in unprocessedTransactions) {
-      transaction.isProcessed = true;
-      await transaction.save();
+  // Clean up resources
+  void dispose() {
+    try {
+      // Close the stream controller when it's no longer needed
+      _transactionsChangedController.close();
+      debugPrint('Transaction stream controller closed');
+    } catch (e) {
+      debugPrint('Error closing transactions stream controller: $e');
     }
   }
 } 

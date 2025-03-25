@@ -36,13 +36,21 @@ class DatabaseService {
   Future<void> init() async {
     if (_isInitialized) return;
     
-    // Open boxes - no need to init Hive or register adapters again, it's done in main.dart
-    await _openBoxes();
-    
-    // Initialize default data if needed
-    await _initializeDefaultData();
-    
-    _isInitialized = true;
+    try {
+      // Open boxes - no need to init Hive or register adapters again, it's done in main.dart
+      await _openBoxes();
+      
+      // Fix any AccountType conversion issues
+      await _fixAccountTypeIssues();
+      
+      // Initialize default data if needed
+      await _initializeDefaultData();
+      
+      _isInitialized = true;
+    } catch (e) {
+      print('Error initializing database: $e');
+      rethrow;
+    }
   }
   
   // Open all required boxes
@@ -90,6 +98,88 @@ class DatabaseService {
       for (final category in [...expenseCategories, ...incomeCategories, ...transferCategories]) {
         await _categoriesBox.put(category.id, category);
       }
+    }
+  }
+  
+  // Fix any AccountType conversion issues
+  Future<void> _fixAccountTypeIssues() async {
+    try {
+      print('Fixing any AccountType conversion issues in accounts...');
+      
+      // Get all accounts
+      final accounts = _accountsBox.values.toList();
+      int fixedCount = 0;
+      
+      // Process and fix all accounts regardless of current state
+      for (final account in accounts) {
+        try {
+          // Extract the AccountType from the current account
+          final currentType = account.type;
+          
+          // Create a new account with the type explicitly converted to a string
+          final fixedAccount = AccountModel(
+            id: account.id,
+            name: account.name,
+            balance: account.balance,
+            type: currentType.toString(), // Store as string representation
+            currency: account.currency,
+            description: account.description,
+            createdAt: account.createdAt,
+            updatedAt: DateTime.now(),
+            isArchived: account.isArchived,
+            bankName: account.bankName,
+            accountNumber: account.accountNumber,
+            colorValue: account.colorValue,
+            accountHolderName: account.accountHolderName,
+            iconData: account.iconData,
+            bankLogoPath: account.bankLogoPath,
+            initialBalance: account.initialBalance,
+            userName: account.userName,
+          );
+          
+          // Save the fixed account
+          await _accountsBox.put(account.id, fixedAccount);
+          fixedCount++;
+          
+        } catch (e) {
+          print('Error handling account type for ${account.name}: $e');
+          
+          // If there's an issue, recreate the account with a safe default
+          try {
+            final fixedAccount = AccountModel(
+              id: account.id,
+              name: account.name,
+              balance: account.balance,
+              type: 'AccountType.cash', // Use a safe default
+              currency: account.currency,
+              description: account.description,
+              createdAt: account.createdAt,
+              updatedAt: DateTime.now(),
+              isArchived: account.isArchived,
+              bankName: account.bankName,
+              accountNumber: account.accountNumber,
+              colorValue: account.colorValue,
+              accountHolderName: account.accountHolderName,
+              iconData: account.iconData,
+              bankLogoPath: account.bankLogoPath,
+              initialBalance: account.initialBalance,
+              userName: account.userName,
+            );
+            
+            // Save the fixed account
+            await _accountsBox.put(account.id, fixedAccount);
+            fixedCount++;
+            print('Fixed account with fallback type for ${account.name}');
+          } catch (fixError) {
+            print('Failed to fix account ${account.name}: $fixError');
+          }
+        }
+      }
+      
+      print('Account type conversion completed: fixed $fixedCount accounts');
+    } catch (e) {
+      print('Error fixing AccountType conversion issues: $e');
+      // Don't throw as this is a recovery routine
     }
   }
   

@@ -55,6 +55,21 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
     super.initState();
     _loadData();
     _searchController.addListener(_onSearchChanged);
+    
+    // Set up stream listeners after initial render
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupStreamListeners();
+    });
+  }
+  
+  void _setupStreamListeners() {
+    // Listen to transaction changes
+    _transactionRepository.transactionsChanged.listen((_) {
+      debugPrint("All Transactions Screen: Transaction change detected!");
+      if (mounted) {
+        _loadData();
+      }
+    });
   }
   
   @override

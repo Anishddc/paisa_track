@@ -62,6 +62,29 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> with Single
     _account = widget.account;
     _tabController = TabController(length: 2, vsync: this);
     _loadData();
+    
+    // Set up stream listeners after initial render
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupStreamListeners();
+    });
+  }
+  
+  void _setupStreamListeners() {
+    // Listen to transaction changes
+    _transactionRepository.transactionsChanged.listen((_) {
+      debugPrint("Account Details: Transaction change detected!");
+      if (mounted) {
+        _loadData();
+      }
+    });
+    
+    // Listen to account changes
+    _accountRepository.accountsChanged.listen((_) {
+      debugPrint("Account Details: Account change detected!");
+      if (mounted) {
+        _loadData();
+      }
+    });
   }
   
   @override
@@ -226,7 +249,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> with Single
   }
   
   Future<void> _showAddTransactionDialog({TransactionType? initialType}) async {
-    final transaction = await showDialog<TransactionModel>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AddTransactionDialog(
@@ -236,16 +259,15 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> with Single
       },
     );
     
-    if (transaction != null) {
-      // Refresh data to update transactions and account balance
-      _loadData();
-      
+    if (result == true) {
+      // If true is returned, a transaction was successfully added
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Transaction added successfully'),
           backgroundColor: ColorConstants.successColor,
         ),
       );
+      // Data will be refreshed automatically via stream listeners
     }
   }
   
@@ -289,47 +311,78 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> with Single
   Widget build(BuildContext context) {
     final currencySymbol = _account.currency.symbol;
     
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_account.name),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: _showEditAccountDialog,
-            tooltip: 'Edit Account',
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: _showDeleteAccountConfirmation,
-            tooltip: 'Delete Account',
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Overview'),
-            Tab(text: 'Transactions'),
-          ],
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                // Overview Tab
-                _buildOverviewTab(currencySymbol),
-                
-                // Transactions Tab
-                _buildTransactionsTab(currencySymbol),
-              ],
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddTransactionDialog(),
-        child: const Icon(Icons.add),
-        tooltip: 'Add Transaction',
-      ),
+    return StreamBuilder<void>(
+      stream: _transactionRepository.transactionsChanged,
+      builder: (context, snapshot) {
+        return StreamBuilder<void>(
+          stream: _accountRepository.accountsChanged,
+          builder: (context, accountSnapshot) {
+            // Always reload data when either stream emits an event
+            if (snapshot.connectionState == ConnectionState.active || 
+                accountSnapshot.connectionState == ConnectionState.active) {
+              print("Stream event detected in Account Details Screen, reloading data...");
+              // Use Future.microtask to avoid build phase errors
+              Future.microtask(() => _loadData());
+            }
+          
+            return Scaffold(
+              appBar: AppBar(
+                title: Text(_account.name),
+                centerTitle: true,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'Refresh data',
+                    onPressed: () {
+                      _loadData();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Data refreshed'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: _showEditAccountDialog,
+                    tooltip: 'Edit Account',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: _showDeleteAccountConfirmation,
+                    tooltip: 'Delete Account',
+                  ),
+                ],
+                bottom: TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(text: 'Overview'),
+                    Tab(text: 'Transactions'),
+                  ],
+                ),
+              ),
+              body: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        // Overview Tab
+                        _buildOverviewTab(currencySymbol),
+                        
+                        // Transactions Tab
+                        _buildTransactionsTab(currencySymbol),
+                      ],
+                    ),
+              floatingActionButton: FloatingActionButton(
+                onPressed: () => _showAddTransactionDialog(),
+                child: const Icon(Icons.add),
+                tooltip: 'Add Transaction',
+              ),
+            );
+          }
+        );
+      }
     );
   }
   
@@ -353,68 +406,59 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> with Single
       }
     }
     
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Account card
-          _buildAccountCard(currencySymbol),
-          const SizedBox(height: 16),
-          
-          // Quick action buttons
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildQuickActionButton(
-                    icon: Icons.arrow_upward,
-                    label: 'Income',
-                    color: ColorConstants.successColor,
-                    onTap: () => _showAddTransactionDialog(initialType: TransactionType.income),
-                  ),
-                  _buildQuickActionButton(
-                    icon: Icons.arrow_downward,
-                    label: 'Expense',
-                    color: ColorConstants.errorColor,
-                    onTap: () => _showAddTransactionDialog(initialType: TransactionType.expense),
-                  ),
-                  _buildQuickActionButton(
-                    icon: Icons.swap_horiz,
-                    label: 'Transfer',
-                    color: ColorConstants.infoColor,
-                    onTap: () => _showAddTransactionDialog(initialType: TransactionType.transfer),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          
-          // Monthly statistics
-          _buildMonthlyStatistics(currencySymbol, monthlyIncome, monthlyExpense),
-          const SizedBox(height: 24),
-          
-          // Recent transactions
-          _buildRecentTransactionsSection(currencySymbol),
-        ],
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Account Balance Card
+            _buildAccountBalanceCard(currencySymbol),
+            const SizedBox(height: 20),
+            
+            // Quick action buttons
+            _buildQuickActionsCard(),
+            const SizedBox(height: 20),
+            
+            // Monthly statistics
+            _buildMonthlyStatisticsCard(currencySymbol, monthlyIncome, monthlyExpense),
+            const SizedBox(height: 20),
+            
+            // Recent transactions
+            _buildRecentTransactionsCard(currencySymbol),
+          ],
+        ),
       ),
     );
   }
   
-  Widget _buildAccountCard(String currencySymbol) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+  Widget _buildAccountBalanceCard(String currencySymbol) {
+    final formatter = NumberFormat.currency(symbol: currencySymbol);
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            ColorConstants.primaryColor,
+            ColorConstants.primaryColor.withOpacity(0.7),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: ColorConstants.primaryColor.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -424,37 +468,38 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> with Single
                   ? Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _account.color.withOpacity(0.1),
+                        color: Colors.white.withOpacity(0.2),
                       ),
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(8),
                       child: ClipOval(
                         child: Image.asset(
                           _account.bankLogoPath!,
-                          width: 28,
-                          height: 28,
+                          width: 36,
+                          height: 36,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
-                            return ClipOval(
-                              child: Image.asset(
-                                'assets/images/app_icon.png',
-                                width: 28,
-                                height: 28,
-                                fit: BoxFit.cover,
-                              ),
+                            return Icon(
+                              _getIconForAccountType(_account.type),
+                              color: Colors.white,
+                              size: 24,
                             );
                           },
                         ),
                       ),
                     )
-                  : ClipOval(
-                      child: Image.asset(
-                        'assets/images/app_icon.png',
-                        width: 28,
-                        height: 28,
-                        fit: BoxFit.cover,
+                  : Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.2),
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(
+                        _getIconForAccountType(_account.type),
+                        color: Colors.white,
+                        size: 24,
                       ),
                     ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,247 +507,480 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> with Single
                       Text(
                         _account.name,
                         style: const TextStyle(
+                          color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      if (_account.type == AccountType.bank && _account.accountNumber != null)
+                        Text(
+                          'xxxx ${_account.accountNumber!.substring(_account.accountNumber!.length - 4)}',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 12,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _getAccountTypeString(_account.type),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Current Balance',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              formatter.format(_account.balance),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Last updated: ${DateFormat('MMM d, yyyy').format(DateTime.now())}',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildQuickActionsCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Quick Actions',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildQuickActionButton(
+                icon: Icons.arrow_upward,
+                label: 'Income',
+                color: Colors.green.shade600,
+                onTap: () => _showAddTransactionDialog(initialType: TransactionType.income),
+              ),
+              _buildQuickActionButton(
+                icon: Icons.arrow_downward,
+                label: 'Expense',
+                color: Colors.red.shade600,
+                onTap: () => _showAddTransactionDialog(initialType: TransactionType.expense),
+              ),
+              _buildQuickActionButton(
+                icon: Icons.swap_horiz,
+                label: 'Transfer',
+                color: Colors.blue.shade600,
+                onTap: () => _showAddTransactionDialog(initialType: TransactionType.transfer),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildQuickActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 80,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildMonthlyStatisticsCard(String currencySymbol, double income, double expense) {
+    final currencyFormat = NumberFormat.currency(symbol: currencySymbol);
+    final monthName = DateFormat('MMMM').format(DateTime.now());
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$monthName Summary',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatItem(
+                  label: 'Income',
+                  amount: income,
+                  currencyFormat: currencyFormat,
+                  icon: Icons.arrow_upward,
+                  color: Colors.green.shade600,
+                ),
+              ),
+              Container(
+                height: 50,
+                width: 1,
+                color: Colors.grey.shade200,
+              ),
+              Expanded(
+                child: _buildStatItem(
+                  label: 'Expenses',
+                  amount: expense,
+                  currencyFormat: currencyFormat,
+                  icon: Icons.arrow_downward,
+                  color: Colors.red.shade600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Net Cash Flow',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                currencyFormat.format(income - expense),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: income >= expense ? Colors.green.shade600 : Colors.red.shade600,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildStatItem({
+    required String label,
+    required double amount,
+    required NumberFormat currencyFormat,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 20,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            currencyFormat.format(amount),
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildRecentTransactionsCard(String currencySymbol) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Recent Transactions',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    // Switch to transactions tab
+                    _tabController.animateTo(1);
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: ColorConstants.primaryColor,
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(50, 30),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('See All'),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          if (_recentTransactions.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(
+                child: Text(
+                  'No transactions yet',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _recentTransactions.length > 5 ? 5 : _recentTransactions.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final transaction = _recentTransactions[index];
+                return _buildTransactionListItem(transaction, currencySymbol);
+              },
+            ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: ColorConstants.primaryColor.withOpacity(0.05),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
+            ),
+            child: TextButton.icon(
+              onPressed: () => _showAddTransactionDialog(),
+              icon: const Icon(Icons.add_circle_outline, size: 18),
+              label: const Text('Add Transaction'),
+              style: TextButton.styleFrom(
+                foregroundColor: ColorConstants.primaryColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildTransactionListItem(TransactionModel transaction, String currencySymbol) {
+    final formatter = NumberFormat.currency(symbol: currencySymbol);
+    final category = _categoriesMap[transaction.categoryId];
+    final dateStr = DateFormat('MMM d, yyyy').format(transaction.date);
+    
+    Color amountColor;
+    IconData transactionIcon;
+    
+    if (transaction.isIncome) {
+      amountColor = Colors.green.shade600;
+      transactionIcon = Icons.arrow_downward;
+    } else if (transaction.isExpense) {
+      amountColor = Colors.red.shade600;
+      transactionIcon = Icons.arrow_upward;
+    } else {
+      amountColor = Colors.blue.shade600;
+      transactionIcon = Icons.swap_horiz;
+    }
+    
+    return InkWell(
+      onTap: () => _showTransactionDetails(transaction),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: category?.color.withOpacity(0.1) ?? Colors.grey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                category?.icon ?? transactionIcon,
+                color: category?.color ?? amountColor,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    transaction.description,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      if (category != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: category.color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            category.name,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: category.color,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      if (category != null)
+                        const SizedBox(width: 6),
                       Text(
-                        _account.type.name,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
+                        dateStr,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
             Text(
-              'Current Balance',
+              formatter.format(transaction.amount),
               style: TextStyle(
+                fontWeight: FontWeight.bold,
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: amountColor,
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '$currencySymbol${_account.balance.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: _account.balance >= 0 ? ColorConstants.successColor : ColorConstants.errorColor,
-              ),
-            ),
-            
-            // Account details for bank or digital wallet
-            if (_account.type == AccountType.bank || _account.type == AccountType.digitalWallet) ...[
-              const SizedBox(height: 16),
-              Text(
-                _account.type == AccountType.bank ? 'Bank Details' : 'Wallet Details',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 8),
-              if (_account.bankName != null && _account.bankName!.isNotEmpty)
-                _buildDetailRow(
-                  _account.type == AccountType.bank ? 'Bank' : 'Wallet', 
-                  _account.bankName!,
-                ),
-              if (_account.accountHolderName != null && _account.accountHolderName!.isNotEmpty)
-                _buildDetailRow(
-                  _account.type == AccountType.bank ? 'Account Holder' : 'Owner', 
-                  _account.accountHolderName!,
-                ),
-              if (_account.accountNumber != null && _account.accountNumber!.isNotEmpty)
-                _buildDetailRow(
-                  _account.type == AccountType.bank ? 'Account Number' : 'Mobile Number', 
-                  _account.type == AccountType.bank 
-                      ? '••••${_account.accountNumber!.substring(math.max(0, _account.accountNumber!.length - 4))}' 
-                      : _account.accountNumber!,
-                ),
-            ],
-            
-            if (_account.description != null && _account.description!.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(
-                'Notes',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(_account.description!),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildMonthlyStatistics(String currencySymbol, double income, double expense) {
-    final monthYearFormat = DateFormat('MMMM yyyy');
-    final currentMonth = monthYearFormat.format(DateTime.now());
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Statistics for $currentMonth',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatItem(
-                  'Income',
-                  '$currencySymbol${income.toStringAsFixed(2)}',
-                  Icons.arrow_upward,
-                  ColorConstants.successColor,
-                ),
-                Container(
-                  height: 40,
-                  width: 1,
-                  color: Colors.grey[300],
-                ),
-                _buildStatItem(
-                  'Expense',
-                  '$currencySymbol${expense.toStringAsFixed(2)}',
-                  Icons.arrow_downward,
-                  ColorConstants.errorColor,
-                ),
-                Container(
-                  height: 40,
-                  width: 1,
-                  color: Colors.grey[300],
-                ),
-                _buildStatItem(
-                  'Net',
-                  '$currencySymbol${(income - expense).toStringAsFixed(2)}',
-                  income - expense >= 0 ? Icons.trending_up : Icons.trending_down,
-                  income - expense >= 0 ? ColorConstants.successColor : ColorConstants.errorColor,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Icon(
-          icon,
-          color: color,
-          size: 16,
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildRecentTransactionsSection(String currencySymbol) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Recent Transactions',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                _tabController.animateTo(1); // Switch to transactions tab
-              },
-              child: const Text('See All'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        
-        _recentTransactions.isEmpty
-            ? _buildEmptyTransactions()
-            : Column(
-                children: _recentTransactions.map((transaction) {
-                  return _buildTransactionItem(
-                    transaction: transaction,
-                    currencySymbol: currencySymbol,
-                  );
-                }).toList(),
-              ),
-      ],
-    );
-  }
-  
-  Widget _buildEmptyTransactions() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AppIcon(
-              size: 80,
-              primaryColor: Theme.of(context).primaryColor.withOpacity(0.7),
-              secondaryColor: Theme.of(context).primaryColor,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No transactions yet',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Start recording your financial activity for this account',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                  ),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () {
-                _showAddTransactionDialog();
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Add Transaction'),
             ),
           ],
         ),
@@ -710,6 +988,40 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> with Single
     );
   }
   
+  IconData _getIconForAccountType(AccountType type) {
+    switch (type) {
+      case AccountType.bank:
+        return Icons.account_balance;
+      case AccountType.cash:
+        return Icons.money;
+      case AccountType.creditCard:
+        return Icons.credit_card;
+      case AccountType.digitalWallet:
+        return Icons.smartphone;
+      case AccountType.investment:
+        return Icons.trending_up;
+      default:
+        return Icons.account_balance_wallet;
+    }
+  }
+  
+  String _getAccountTypeString(AccountType type) {
+    switch (type) {
+      case AccountType.bank:
+        return 'Bank';
+      case AccountType.cash:
+        return 'Cash';
+      case AccountType.creditCard:
+        return 'Credit Card';
+      case AccountType.digitalWallet:
+        return 'Digital Wallet';
+      case AccountType.investment:
+        return 'Investment';
+      default:
+        return 'Other';
+    }
+  }
+
   Widget _buildTransactionsTab(String currencySymbol) {
     return Column(
       children: [
@@ -1154,46 +1466,6 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> with Single
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 20,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: color,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

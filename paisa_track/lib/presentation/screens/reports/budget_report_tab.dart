@@ -4,9 +4,12 @@ import 'package:intl/intl.dart';
 import 'package:paisa_track/core/constants/color_constants.dart';
 import 'package:paisa_track/data/models/category_model.dart';
 import 'package:paisa_track/data/models/transaction_model.dart';
+import 'package:paisa_track/data/models/enums/transaction_type.dart';
 import 'package:paisa_track/data/repositories/category_repository.dart';
 import 'package:paisa_track/data/repositories/transaction_repository.dart';
 import 'package:provider/provider.dart';
+import 'package:paisa_track/core/utils/date_utils.dart' as date_utils;
+import 'package:paisa_track/presentation/widgets/loader.dart';
 
 class BudgetReportTab extends StatefulWidget {
   const BudgetReportTab({Key? key}) : super(key: key);
@@ -27,27 +30,34 @@ class _BudgetReportTabState extends State<BudgetReportTab> {
   List<TransactionModel> _currentMonthTransactions = [];
   
   // Date range
-  DateTime _startDate = DateTime.now();
-  DateTime _endDate = DateTime.now();
+  DateTime _startDate = DateTime.now().copyWith(day: 1);
+  DateTime _endDate = DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
+  
+  double _totalIncome = 0;
+  double _totalExpense = 0;
+  double _netIncome = 0;
+  
+  Map<String, double> _spendingByCategory = {};
+  List<Color> _categoryColors = [];
   
   @override
   void initState() {
     super.initState();
-    // Initialize date range to current month
-    final now = DateTime.now();
-    _startDate = DateTime(now.year, now.month, 1);
-    _endDate = DateTime(now.year, now.month + 1, 0);
   }
   
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    
+    // Get repository instances
     _categoryRepository = Provider.of<CategoryRepository>(context, listen: false);
     _transactionRepository = Provider.of<TransactionRepository>(context, listen: false);
+    
+    // Initial data load
     _loadData();
   }
   
-  void _loadData() async {
+  Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
     });
@@ -60,9 +70,10 @@ class _BudgetReportTabState extends State<BudgetReportTab> {
       
       // Load transactions for selected period
       _currentMonthTransactions = _transactionRepository
-          .getTransactionsInRange(_startDate, _endDate)
-          .where((t) => t.isExpense)
-          .toList();
+          .getTransactionsInRange(_startDate, _endDate);
+      
+      _calculateSummary();
+      _calculateSpendingByCategory();
       
       setState(() {
         _isLoading = false;
@@ -72,6 +83,43 @@ class _BudgetReportTabState extends State<BudgetReportTab> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+  
+  void _calculateSummary() {
+    _totalIncome = 0;
+    _totalExpense = 0;
+
+    for (final transaction in _currentMonthTransactions) {
+      if (transaction.isIncome) {
+        _totalIncome += transaction.amount;
+      } else if (transaction.isExpense) {
+        _totalExpense += transaction.amount;
+      }
+    }
+
+    _netIncome = _totalIncome - _totalExpense;
+  }
+  
+  void _calculateSpendingByCategory() {
+    _spendingByCategory = {};
+    _categoryColors = [];
+
+    for (final transaction in _currentMonthTransactions) {
+      if (transaction.isExpense) {
+        final category = _categoryRepository.getCategoryById(transaction.categoryId);
+        if (category != null) {
+          final String categoryName = category.name;
+          
+          if (_spendingByCategory.containsKey(categoryName)) {
+            _spendingByCategory[categoryName] = 
+                _spendingByCategory[categoryName]! + transaction.amount;
+          } else {
+            _spendingByCategory[categoryName] = transaction.amount;
+            _categoryColors.add(category.color);
+          }
+        }
+      }
     }
   }
   
@@ -101,79 +149,89 @@ class _BudgetReportTabState extends State<BudgetReportTab> {
   
   @override
   Widget build(BuildContext context) {
-    return _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : RefreshIndicator(
-            onRefresh: () async {
-              _loadData();
-            },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildDateRangePicker(),
-                    const SizedBox(height: 16),
-                    _buildBudgetSummary(),
-                    const SizedBox(height: 16),
-                    _buildBudgetPieChart(),
-                    const SizedBox(height: 16),
-                    _buildBudgetProgressCharts(),
-                    const SizedBox(height: 16),
-                    _buildMonthlyTrendChart(),
-                  ],
+    return StreamBuilder<void>(
+      stream: _transactionRepository.transactionsChanged,
+      builder: (context, snapshot) {
+        // Reload data when stream emits an event
+        if (snapshot.connectionState == ConnectionState.active) {
+          // Load data on a slight delay to ensure Hive has completed its operation
+          Future.microtask(() => _loadData());
+        }
+        
+        return _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _loadData,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 100),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDateSelector(),
+                      _buildSummaryCards(),
+                      _buildBudgetChart(),
+                      _buildCategoryBreakdown(),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-          );
+              );
+      },
+    );
   }
   
-  Widget _buildDateRangePicker() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildDateSelector() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: _selectDateRange,
+        child: Row(
           children: [
-            const Text(
-              'Select Time Period',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+            Icon(
+              Icons.calendar_today,
+              color: ColorConstants.primaryColor,
+              size: 18,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Date Range',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${DateFormat('MMM d, y').format(_startDate)} - ${DateFormat('MMM d, y').format(_endDate)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(DateFormat('MMM dd, yyyy').format(_startDate)),
-                    onPressed: () => _selectDate(true),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                const Text('to'),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(DateFormat('MMM dd, yyyy').format(_endDate)),
-                    onPressed: () => _selectDate(false),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildQuickDateButton('This Month', () => _setThisMonth()),
-                _buildQuickDateButton('Last Month', () => _setLastMonth()),
-                _buildQuickDateButton('Last 3 Months', () => _setLastNMonths(3)),
-              ],
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.grey,
+              size: 16,
             ),
           ],
         ),
@@ -181,418 +239,527 @@ class _BudgetReportTabState extends State<BudgetReportTab> {
     );
   }
   
-  Widget _buildQuickDateButton(String label, VoidCallback onPressed) {
-    return TextButton(
-      onPressed: onPressed,
-      child: Text(label),
-      style: TextButton.styleFrom(
-        backgroundColor: ColorConstants.primaryColor.withOpacity(0.1),
-        foregroundColor: ColorConstants.primaryColor,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      ),
-    );
-  }
-  
-  Future<void> _selectDate(bool isStartDate) async {
-    final DateTime? picked = await showDatePicker(
+  Future<void> _selectDateRange() async {
+    final DateTimeRange? pickedRange = await showDateRangePicker(
       context: context,
-      initialDate: isStartDate ? _startDate : _endDate,
+      initialDateRange: DateTimeRange(
+        start: _startDate,
+        end: _endDate,
+      ),
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: ColorConstants.primaryColor,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: ColorConstants.primaryColor,
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
-    
-    if (picked != null) {
+
+    if (pickedRange != null) {
       setState(() {
-        if (isStartDate) {
-          _startDate = picked;
-          // Ensure end date is not before start date
-          if (_endDate.isBefore(_startDate)) {
-            _endDate = _startDate.add(const Duration(days: 1));
-          }
-        } else {
-          _endDate = picked;
-          // Ensure start date is not after end date
-          if (_startDate.isAfter(_endDate)) {
-            _startDate = _endDate.subtract(const Duration(days: 1));
-          }
-        }
+        _startDate = pickedRange.start;
+        _endDate = pickedRange.end;
       });
       _loadData();
     }
   }
   
-  void _setThisMonth() {
-    final now = DateTime.now();
-    setState(() {
-      _startDate = DateTime(now.year, now.month, 1);
-      _endDate = DateTime(now.year, now.month + 1, 0);
-    });
-    _loadData();
-  }
-  
-  void _setLastMonth() {
-    final now = DateTime.now();
-    setState(() {
-      _startDate = DateTime(now.year, now.month - 1, 1);
-      _endDate = DateTime(now.year, now.month, 0);
-    });
-    _loadData();
-  }
-  
-  void _setLastNMonths(int months) {
-    final now = DateTime.now();
-    setState(() {
-      _startDate = DateTime(now.year, now.month - (months - 1), 1);
-      _endDate = DateTime(now.year, now.month + 1, 0);
-    });
-    _loadData();
-  }
-  
-  Widget _buildBudgetSummary() {
+  Widget _buildSummaryCards() {
     final currencyFormat = NumberFormat.currency(symbol: '\$');
-    final totalBudget = _getTotalBudget();
-    final totalSpending = _getTotalSpending();
     
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Budget Summary: ${DateFormat('MMMM yyyy').format(_startDate)}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildBudgetSummaryItem(
-                  'Total Budget',
-                  currencyFormat.format(totalBudget),
-                  Icons.account_balance_wallet,
-                  ColorConstants.primaryColor,
-                ),
-                _buildBudgetSummaryItem(
-                  'Total Spent',
-                  currencyFormat.format(totalSpending),
-                  Icons.shopping_cart,
-                  totalSpending > totalBudget && totalBudget > 0
-                      ? ColorConstants.errorColor 
-                      : ColorConstants.successColor,
-                ),
-                _buildBudgetSummaryItem(
-                  'Remaining',
-                  currencyFormat.format(totalBudget - totalSpending),
-                  Icons.savings,
-                  totalSpending > totalBudget && totalBudget > 0
-                      ? ColorConstants.errorColor 
-                      : ColorConstants.successColor,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            LinearProgressIndicator(
-              value: totalBudget > 0 ? (totalSpending / totalBudget).clamp(0.0, 1.0) : 0.0,
-              backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation<Color>(
-                totalSpending > totalBudget && totalBudget > 0
-                    ? ColorConstants.errorColor 
-                    : ColorConstants.successColor,
-              ),
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              totalBudget <= 0 
-                  ? 'No budget set for this period.'
-                  : totalSpending > totalBudget 
-                      ? 'Over budget by ${currencyFormat.format(totalSpending - totalBudget)}' 
-                      : '${((totalSpending / totalBudget) * 100).toStringAsFixed(1)}% of budget used',
-              style: TextStyle(
-                color: totalSpending > totalBudget && totalBudget > 0
-                    ? ColorConstants.errorColor 
-                    : ColorConstants.successColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildBudgetSummaryItem(String label, String value, IconData icon, Color color) {
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 20,
-          backgroundColor: color.withOpacity(0.2),
-          child: Icon(
-            icon,
-            color: color,
-            size: 20,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-          ),
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildBudgetPieChart() {
-    final categoriesWithBudget = _categories
-        .where((c) => c.monthlyBudget > 0)
-        .toList();
-    
-    if (categoriesWithBudget.isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Center(
-            child: Text(
-              'No budget data available for this period.',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ),
-        ),
-      );
-    }
-    
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Budget Allocation',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 200,
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: PieChart(
-                      PieChartData(
-                        sections: _getBudgetPieSections(),
-                        centerSpaceRadius: 40,
-                        sectionsSpace: 2,
-                        pieTouchData: PieTouchData(
-                          enabled: true,
-                          touchCallback: (_, pieTouchResponse) {},
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: _buildPieLegend(),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  List<PieChartSectionData> _getBudgetPieSections() {
-    final categoriesWithBudget = _categories
-        .where((c) => c.monthlyBudget > 0)
-        .toList();
-    
-    final totalBudget = _getTotalBudget();
-    
-    return categoriesWithBudget.map((category) {
-      final percentage = (category.monthlyBudget / totalBudget) * 100;
-      return PieChartSectionData(
-        color: category.color,
-        value: category.monthlyBudget,
-        title: '${percentage.toStringAsFixed(0)}%',
-        radius: 50,
-        titleStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      );
-    }).toList();
-  }
-  
-  Widget _buildPieLegend() {
-    final categoriesWithBudget = _categories
-        .where((c) => c.monthlyBudget > 0)
-        .take(5)
-        .toList()
-      ..sort((a, b) => b.monthlyBudget.compareTo(a.monthlyBudget));
-    
-    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: categoriesWithBudget.map((category) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
-          child: Row(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        children: [
+          Row(
             children: [
-              Container(
-                width: 12,
-                height: 12,
-                color: category.color,
-              ),
-              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  category.name,
-                  style: const TextStyle(fontSize: 12),
-                  overflow: TextOverflow.ellipsis,
+                child: _buildSummaryCard(
+                  title: 'Income',
+                  amount: _totalIncome,
+                  currencyFormat: currencyFormat,
+                  color: Colors.green.shade600,
+                  icon: Icons.arrow_upward,
                 ),
               ),
-              Text(
-                currencyFormat.format(category.monthlyBudget),
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSummaryCard(
+                  title: 'Expenses',
+                  amount: _totalExpense,
+                  currencyFormat: currencyFormat,
+                  color: Colors.red.shade600,
+                  icon: Icons.arrow_downward,
+                ),
               ),
             ],
           ),
-        );
-      }).toList(),
-    );
-  }
-  
-  Widget _buildBudgetProgressCharts() {
-    final categoriesWithBudget = _categories
-        .where((c) => c.monthlyBudget > 0)
-        .toList()
-      ..sort((a, b) => b.monthlyBudget.compareTo(a.monthlyBudget));
-    
-    if (categoriesWithBudget.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Budget Progress by Category',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...categoriesWithBudget.map(_buildCategoryBudgetProgress).toList(),
-          ],
-        ),
+          const SizedBox(height: 12),
+          _buildNetIncomeCard(currencyFormat),
+        ],
       ),
     );
   }
   
-  Widget _buildCategoryBudgetProgress(CategoryModel category) {
-    final currencyFormat = NumberFormat.currency(symbol: '\$');
-    final spending = _getCategorySpending(category.id);
-    final percentage = (spending / category.monthlyBudget).clamp(0.0, 1.0);
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(category.icon, color: category.color, size: 16),
-            const SizedBox(width: 8),
-            Text(
-              category.name,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const Spacer(),
-            Text(
-              '${currencyFormat.format(spending)} of ${currencyFormat.format(category.monthlyBudget)}',
-              style: TextStyle(
-                fontSize: 12,
-                color: spending > category.monthlyBudget
-                    ? ColorConstants.errorColor
-                    : Colors.grey[700],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        LinearProgressIndicator(
-          value: percentage,
-          backgroundColor: Colors.grey[200],
-          valueColor: AlwaysStoppedAnimation<Color>(
-            spending > category.monthlyBudget
-                ? ColorConstants.errorColor
-                : ColorConstants.successColor,
+  Widget _buildSummaryCard({
+    required String title,
+    required double amount,
+    required NumberFormat currencyFormat,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          minHeight: 8,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        const SizedBox(height: 16),
-      ],
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            currencyFormat.format(amount),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
   
-  Widget _buildMonthlyTrendChart() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Monthly Budget Trends',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+  Widget _buildNetIncomeCard(NumberFormat currencyFormat) {
+    final Color textColor = _netIncome >= 0 ? Colors.green.shade600 : Colors.red.shade600;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            ColorConstants.primaryColor.withOpacity(0.8),
+            ColorConstants.primaryColor,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: ColorConstants.primaryColor.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.account_balance_wallet,
+                color: Colors.white,
+                size: 20,
               ),
+              SizedBox(width: 8),
+              Text(
+                'Net Income',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                currencyFormat.format(_netIncome.abs()),
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _netIncome >= 0 ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _netIncome >= 0 ? Icons.trending_up : Icons.trending_down,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _netIncome >= 0 ? 'Savings' : 'Deficit',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildBudgetChart() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Income vs Expenses',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 16),
-            const Center(
-              child: Text(
-                'Historical budget vs. spending data will appear here.',
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pushNamed('/budgets');
-                },
-                child: const Text('Manage Budgets'),
-              ),
+          ),
+          const SizedBox(height: 16),
+          _totalIncome == 0 && _totalExpense == 0
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Text(
+                      'No data available for the selected period',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                )
+              : SizedBox(
+                  height: 200,
+                  child: BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: _totalIncome > _totalExpense 
+                          ? _totalIncome * 1.2 
+                          : _totalExpense * 1.2,
+                      titlesData: FlTitlesData(
+                        show: true,
+                        topTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (double value, TitleMeta meta) {
+                              final titles = ['Income', 'Expense'];
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text(
+                                  titles[value.toInt()],
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 60,
+                            getTitlesWidget: (double value, TitleMeta meta) {
+                              final currencyFormat = NumberFormat.compactCurrency(
+                                symbol: '\$',
+                                decimalDigits: 0,
+                              );
+                              
+                              if (value == 0) {
+                                return const SizedBox.shrink();
+                              }
+                              
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 4.0),
+                                child: Text(
+                                  currencyFormat.format(value),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: _totalIncome > _totalExpense 
+                            ? _totalIncome / 5 
+                            : _totalExpense / 5,
+                        getDrawingHorizontalLine: (value) {
+                          return FlLine(
+                            color: Colors.grey.withOpacity(0.2),
+                            strokeWidth: 1,
+                          );
+                        },
+                      ),
+                      borderData: FlBorderData(
+                        show: false,
+                      ),
+                      barGroups: [
+                        BarChartGroupData(
+                          x: 0,
+                          barRods: [
+                            BarChartRodData(
+                              toY: _totalIncome,
+                              color: Colors.green.shade600,
+                              width: 40,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(8),
+                                topRight: Radius.circular(8),
+                              ),
+                            ),
+                          ],
+                        ),
+                        BarChartGroupData(
+                          x: 1,
+                          barRods: [
+                            BarChartRodData(
+                              toY: _totalExpense,
+                              color: Colors.red.shade600,
+                              width: 40,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(8),
+                                topRight: Radius.circular(8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildCategoryBreakdown() {
+    final currencyFormat = NumberFormat.currency(symbol: '\$');
+    
+    if (_spendingByCategory.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
+        child: const Center(
+          child: Text(
+            'No expense categories for the selected period',
+            style: TextStyle(
+              color: Colors.grey,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // Sort by highest spending
+    final List<MapEntry<String, double>> sortedEntries = 
+        _spendingByCategory.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+          
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Spending by Category',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Column(
+            children: List.generate(
+              sortedEntries.length,
+              (index) {
+                final entry = sortedEntries[index];
+                final percent = (entry.value / _totalExpense) * 100;
+                final color = _categoryColors.length > index 
+                    ? _categoryColors[index] 
+                    : Colors.grey;
+                    
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                entry.key,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            '${percent.toStringAsFixed(1)}%',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                              color: Theme.of(context).brightness == Brightness.dark 
+                                  ? Colors.grey[400] 
+                                  : Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: entry.value / _totalExpense,
+                                minHeight: 6,
+                                backgroundColor: Colors.grey.shade100,
+                                valueColor: AlwaysStoppedAnimation<Color>(color),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            currencyFormat.format(entry.value),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

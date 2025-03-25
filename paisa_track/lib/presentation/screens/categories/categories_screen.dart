@@ -179,7 +179,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> with TickerProvider
         return true;
       },
       child: Scaffold(
-        backgroundColor: Colors.grey[50],
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           elevation: 0,
           title: const Text(
@@ -229,121 +229,86 @@ class _CategoriesScreenState extends State<CategoriesScreen> with TickerProvider
                   _buildCategoryListWithChart(_incomeCategories, true),
                 ],
               ),
-        floatingActionButton: SizedBox(
-          width: 60,
-          height: 60,
-          child: FloatingActionButton(
-            onPressed: () {
-              _navigateToAddEditCategory(
+        floatingActionButton: Container(
+          height: 52,
+          width: 52,
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                ColorConstants.primaryColor,
+                ColorConstants.primaryColor.withOpacity(0.8),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: ColorConstants.primaryColor.withOpacity(0.3),
+                blurRadius: 10,
+                spreadRadius: 2,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _navigateToAddEditCategory(
                 context,
-                isIncome: _tabController.index == 1,
-              );
-            },
-            backgroundColor: ColorConstants.primaryColor,
-            elevation: 4,
-            child: const Icon(
-              Icons.add,
-              color: Colors.white,
-              size: 30,
+                isIncome: _tabController.index == 0
+              ),
+              customBorder: const CircleBorder(),
+              child: const Center(
+                child: Icon(
+                  Icons.add,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
             ),
           ),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        bottomNavigationBar: _buildBottomNavBar(),
-      ),
-    );
-  }
-  
-  Widget _buildBottomNavBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, -5),
+              ),
+            ],
+          ),
+          child: BottomAppBar(
+            shape: const CircularNotchedRectangle(),
+            notchMargin: 8.0,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildNavItem(0, Icons.dashboard_outlined, 'Home', () {
+                    Navigator.pushNamed(context, AppRouter.dashboard);
+                  }),
+                  _buildNavItem(1, Icons.account_balance_wallet_outlined, 'Accounts', () {
+                    Navigator.pushNamed(context, AppRouter.accounts);
+                  }),
+                  const SizedBox(width: 40), // Space for FAB
+                  _buildNavItem(2, Icons.category_outlined, 'Categories', () {
+                    // Already on categories
+                  }),
+                  _buildNavItem(3, Icons.bar_chart_outlined, 'Reports', () {
+                    Navigator.pushNamed(context, AppRouter.reports);
+                  }),
+                ],
+              ),
+            ),
+          ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.07),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 65,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(0, Icons.grid_view_outlined, 'Home'),
-                _buildNavItem(1, Icons.account_balance_wallet_outlined, 'Accounts'),
-                const SizedBox(width: 60),
-                _buildNavItem(2, Icons.category_outlined, 'Categories', isActive: true),
-                _buildNavItem(3, Icons.analytics_outlined, 'Reports'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
       ),
     );
-  }
-
-  Widget _buildNavItem(int index, IconData icon, String label, {bool isActive = false}) {
-    return InkWell(
-      onTap: () => _onItemTapped(index),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 24,
-            color: isActive ? ColorConstants.primaryColor : Colors.grey[400],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isActive ? ColorConstants.primaryColor : Colors.grey[400],
-              fontWeight: isActive ? FontWeight.w500 : FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _onItemTapped(int index) {
-    if (index == 2) return; // Already on categories tab
-    
-    // Navigate to the appropriate screen based on the selected index
-    switch (index) {
-      case 0: // Dashboard
-        Navigator.pushReplacementNamed(
-          context, 
-          AppRouter.dashboard,
-        );
-        break;
-      case 1: // Accounts
-        Navigator.pushReplacementNamed(
-          context, 
-          AppRouter.accounts,
-          arguments: {'fromTab': true},
-        );
-        break;
-      case 3: // Reports
-        Navigator.pushReplacementNamed(
-          context, 
-          AppRouter.reports,
-          arguments: {'fromTab': true},
-        );
-        break;
-    }
   }
   
   Widget _buildCategoryListWithChart(List<CategoryModel> categories, bool isIncome) {
@@ -595,7 +560,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> with TickerProvider
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -640,9 +605,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> with TickerProvider
                     children: [
                       Text(
                         category.name,
-                        style: const TextStyle(
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -651,10 +615,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> with TickerProvider
                         const SizedBox(height: 4),
                         Text(
                           category.description!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -666,7 +627,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> with TickerProvider
                           height: 4,
                           child: LinearProgressIndicator(
                             value: categorySpending / _totalExpense,
-                            backgroundColor: Colors.grey[200],
+                            backgroundColor: Theme.of(context).brightness == Brightness.dark 
+                                ? Colors.grey[800] 
+                                : Colors.grey[200],
                             valueColor: AlwaysStoppedAnimation<Color>(category.color),
                           ),
                         ),
@@ -727,6 +690,38 @@ class _CategoriesScreenState extends State<CategoriesScreen> with TickerProvider
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: index == 2 ? ColorConstants.primaryColor : Colors.grey,
+                size: 22,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: index == 2 ? ColorConstants.primaryColor : Colors.grey,
+                  fontWeight: index == 2 ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ],
           ),
         ),
       ),

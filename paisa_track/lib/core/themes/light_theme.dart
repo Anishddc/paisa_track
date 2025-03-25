@@ -4,36 +4,56 @@ import 'package:paisa_track/core/constants/color_constants.dart';
 final ThemeData lightThemeData = ThemeData(
   useMaterial3: true,
   brightness: Brightness.light,
-  colorScheme: ColorScheme.fromSeed(
-    seedColor: ColorConstants.primaryColor,
-    brightness: Brightness.light,
+  primaryColor: ColorConstants.primaryColor,
+  scaffoldBackgroundColor: const Color(0xFFF8F9FA),
+  colorScheme: ColorScheme.light(
     primary: ColorConstants.primaryColor,
     secondary: ColorConstants.accentColor,
-    tertiary: ColorConstants.accentLightColor,
-    surface: ColorConstants.cardLightColor,
-    background: ColorConstants.scaffoldLightColor,
+    surface: const Color(0xFFF8F9FA),
+    background: const Color(0xFFF8F9FA),
     error: ColorConstants.errorColor,
   ),
-  primaryColor: ColorConstants.primaryColor,
-  scaffoldBackgroundColor: ColorConstants.scaffoldLightColor,
-  cardColor: ColorConstants.cardLightColor,
-  dividerColor: const Color(0xFFE5E7EB),
-  
   appBarTheme: AppBarTheme(
+    backgroundColor: const Color(0xFFF8F9FA),
     elevation: 0,
-    backgroundColor: ColorConstants.scaffoldLightColor,
-    foregroundColor: ColorConstants.primaryTextColor,
-    centerTitle: true,
-    titleTextStyle: const TextStyle(
-      fontSize: 18,
-      fontWeight: FontWeight.w600,
-      color: ColorConstants.primaryTextColor,
-    ),
-    iconTheme: const IconThemeData(
-      color: ColorConstants.primaryColor,
+    iconTheme: const IconThemeData(color: Colors.black),
+    titleTextStyle: TextStyle(
+      color: Colors.black,
+      fontSize: 20,
+      fontWeight: FontWeight.bold,
     ),
   ),
-  
+  cardTheme: CardTheme(
+    color: const Color(0xFFF8F9FA),
+    elevation: 2,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+  ),
+  bottomNavigationBarTheme: BottomNavigationBarThemeData(
+    backgroundColor: const Color(0xFFF8F9FA),
+    selectedItemColor: ColorConstants.primaryColor,
+    unselectedItemColor: Colors.black,
+  ),
+  drawerTheme: DrawerThemeData(
+    backgroundColor: const Color(0xFFF8F9FA),
+  ),
+  dialogTheme: DialogTheme(
+    backgroundColor: const Color(0xFFF8F9FA),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+  ),
+  bottomSheetTheme: BottomSheetThemeData(
+    backgroundColor: const Color(0xFFF8F9FA),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+  ),
+  dividerTheme: DividerThemeData(
+    color: Colors.grey.withOpacity(0.1),
+    thickness: 1,
+  ),
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
       backgroundColor: ColorConstants.primaryColor,
@@ -118,34 +138,6 @@ final ThemeData lightThemeData = ThemeData(
     labelStyle: const TextStyle(
       color: ColorConstants.secondaryTextColor,
       fontSize: 16,
-    ),
-  ),
-  
-  cardTheme: CardTheme(
-    elevation: 2,
-    shadowColor: Colors.black.withOpacity(0.1),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-    ),
-    color: ColorConstants.cardLightColor,
-    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-    clipBehavior: Clip.antiAlias,
-  ),
-  
-  bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-    backgroundColor: ColorConstants.cardLightColor,
-    selectedItemColor: ColorConstants.primaryColor,
-    unselectedItemColor: ColorConstants.secondaryTextColor,
-    showSelectedLabels: true,
-    showUnselectedLabels: true,
-    type: BottomNavigationBarType.fixed,
-    elevation: 8,
-    selectedLabelStyle: TextStyle(
-      fontWeight: FontWeight.w600,
-      fontSize: 12,
-    ),
-    unselectedLabelStyle: TextStyle(
-      fontSize: 12,
     ),
   ),
   
