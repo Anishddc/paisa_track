@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.0-beta.2+2 (2025-03-25)
+## 1.0.0-beta.2+2 (2025-03-25)
 
 ### Added
 - Complete dark mode support throughout the app
