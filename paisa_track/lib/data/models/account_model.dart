@@ -60,11 +60,28 @@ class AccountModel extends HiveObject {
   @HiveField(16)
   final String? userName;
   
-  static const IconData defaultIcon = Icons.account_balance;  // Make this constant
+  // New field to explicitly store the account type as an index
+  @HiveField(17, defaultValue: 1) // 1 is the index of cash
+  final int _typeIndex;
+  
+  static const IconData defaultIcon = Icons.account_balance;
+  
+  // Helper method to get an explicit type index from AccountType
+  static int _getTypeIndex(AccountType type) {
+    return AccountType.values.indexOf(type);
+  }
+  
+  // Helper method to get AccountType from index
+  static AccountType _getTypeFromIndex(int index) {
+    if (index >= 0 && index < AccountType.values.length) {
+      return AccountType.values[index];
+    }
+    return AccountType.cash; // Fallback
+  }
   
   // Convert AccountType to String for storage
   String _accountTypeToString(AccountType type) {
-    return type.toString();
+    return 'AccountType.${type.name}';
   }
   
   // Convert String to AccountType
@@ -75,34 +92,26 @@ class AccountModel extends HiveObject {
         return typeInput;
       }
       
+      // Handle int (for index-based lookup)
+      if (typeInput is int) {
+        return _getTypeFromIndex(typeInput);
+      }
+      
       // Convert to string to handle various input formats
       final typeString = typeInput.toString();
       
       // Handle full enum path names
-      if (typeString == 'AccountType.bank') return AccountType.bank;
-      if (typeString == 'AccountType.cash') return AccountType.cash;
-      if (typeString == 'AccountType.digitalWallet') return AccountType.digitalWallet;
-      if (typeString == 'AccountType.card') return AccountType.card;
-      if (typeString == 'AccountType.wallet') return AccountType.wallet;
-      if (typeString == 'AccountType.creditCard') return AccountType.creditCard;
-      if (typeString == 'AccountType.investment') return AccountType.investment;
-      if (typeString == 'AccountType.loan') return AccountType.loan;
-      if (typeString == 'AccountType.other') return AccountType.other;
+      if (typeString.contains('AccountType.')) {
+        final typeName = typeString.split('.').last;
+        return AccountType.values.firstWhere(
+          (e) => e.name == typeName,
+          orElse: () => AccountType.cash,
+        );
+      }
       
       // Handle simple enum value names
-      if (typeString == 'bank') return AccountType.bank;
-      if (typeString == 'cash') return AccountType.cash;
-      if (typeString == 'digitalWallet') return AccountType.digitalWallet;
-      if (typeString == 'card') return AccountType.card;
-      if (typeString == 'wallet') return AccountType.wallet;
-      if (typeString == 'creditCard') return AccountType.creditCard;
-      if (typeString == 'investment') return AccountType.investment;
-      if (typeString == 'loan') return AccountType.loan;
-      if (typeString == 'other') return AccountType.other;
-      
-      // Try to match by enum value name or full toString() representation
       return AccountType.values.firstWhere(
-        (e) => e.toString() == typeString || e.name == typeString,
+        (e) => e.name == typeString,
         orElse: () => AccountType.cash,
       );
     } catch (_) {
@@ -110,21 +119,27 @@ class AccountModel extends HiveObject {
     }
   }
   
-  // Getter to access AccountType
+  // Getter to access AccountType - now uses both _typeIndex and _typeString for reliability
   AccountType get type {
     try {
-      // Handle the case where _typeString might actually be an AccountType enum
-      if (_typeString is AccountType) {
-        return _typeString as AccountType;
+      // First try to use the type index as the most reliable method
+      if (_typeIndex >= 0 && _typeIndex < AccountType.values.length) {
+        return AccountType.values[_typeIndex];
       }
       
-      // Otherwise, convert from string
+      // Fall back to string parsing if needed
       return _stringToAccountType(_typeString);
     } catch (_) {
-      // Fallback to safe default
+      // Ultimate fallback
       return AccountType.cash;
     }
   }
+  
+  // Getter to access raw _typeString for debugging
+  String get typeString => _typeString;
+  
+  // Getter to access _typeIndex for debugging
+  int get typeIndex => _typeIndex;
   
   AccountModel({
     String? id,
@@ -146,13 +161,20 @@ class AccountModel extends HiveObject {
     this.bankLogoPath,
     double? initialBalance,
     this.userName,
+    int? typeIndex,
   }) : id = id ?? const Uuid().v4(),
-       // Handle different type parameters - now with more robust handling
+       // Determine the actual AccountType from input
+       _typeIndex = typeIndex ?? (type is AccountType
+           ? _getTypeIndex(type)
+           : (type is int
+               ? type
+               : _getTypeIndex(_stringToAccountType(type)))),
+       // Store the string representation as well for backward compatibility
        _typeString = type is AccountType 
-           ? type.toString() 
+           ? 'AccountType.${type.name}'
            : (type is String 
-               ? type 
-               : AccountType.cash.toString()),
+               ? (type.contains('AccountType.') ? type : 'AccountType.${_stringToAccountType(type).name}')
+               : 'AccountType.${_stringToAccountType(type).name}'),
        currency = currency ?? (currencyCode != null ? CurrencyType.fromCode(currencyCode) : CurrencyType.usd),
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
@@ -165,12 +187,12 @@ class AccountModel extends HiveObject {
   Color get color => Color(colorValue);
   
   IconData get icon {
-    // If iconData is provided, use it, otherwise use the icon from AccountType extension
+    // If iconData is provided, use it
     if (iconData != null) {
       return IconData(iconData!, fontFamily: 'MaterialIcons');
     }
     
-    // Use the icon from AccountType extension
+    // Otherwise use the default icon for the account type
     return type.icon;
   }
   
@@ -214,11 +236,24 @@ class AccountModel extends HiveObject {
     double? initialBalance,
     String? userName,
   }) {
+    // Determine the AccountType to use
+    final AccountType newType = type is AccountType 
+        ? type 
+        : (type is String 
+            ? _stringToAccountType(type) 
+            : this.type);
+            
+    // Get the type index explicitly
+    final int newTypeIndex = type != null
+        ? _getTypeIndex(newType)
+        : _typeIndex;
+            
     return AccountModel(
       id: id,
       name: name ?? this.name,
       balance: balance ?? this.balance,
-      type: type ?? this.type,
+      type: newType,
+      typeIndex: newTypeIndex, // Pass the explicit type index
       currency: currency ?? this.currency,
       description: description ?? this.description,
       createdAt: createdAt,

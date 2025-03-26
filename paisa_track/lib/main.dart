@@ -27,12 +27,15 @@ import 'dart:io';
 import 'package:paisa_track/providers/theme_provider.dart';
 import 'package:paisa_track/providers/auth_provider.dart';
 import 'package:paisa_track/providers/user_profile_provider.dart';
+import 'package:paisa_track/providers/currency_provider.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:paisa_track/data/models/app_icon.dart';
 import 'package:paisa_track/data/models/bank_data.dart';
 import 'package:paisa_track/data/repositories/account_repository.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:async';
+import 'package:paisa_track/data/models/custom_account_model_adapter.dart';
 
 Future<void> main() async {
   // This preserves the splash screen
@@ -221,10 +224,20 @@ Future<void> main() async {
     // Check if onboarding is completed
     final prefs = await SharedPreferences.getInstance();
     final hasCompletedOnboarding = prefs.getBool('onboarding_completed') ?? false;
+    final isFirstLaunch = prefs.getBool(AppConstants.isFirstLaunchKey) ?? true;
     
     // Check if user setup is completed
     final userRepository = UserRepository();
     final hasUserProfile = await userRepository.hasUserProfile();
+    
+    // Set first launch to false regardless of what happens, so we only see onboarding once
+    if (isFirstLaunch) {
+      await prefs.setBool(AppConstants.isFirstLaunchKey, false);
+    }
+    
+    print('First launch: $isFirstLaunch');
+    print('Onboarding completed: $hasCompletedOnboarding');
+    print('User profile exists: $hasUserProfile');
     
     if (!hasCompletedOnboarding) {
       initialRoute = AppRouter.onboarding;
@@ -233,8 +246,9 @@ Future<void> main() async {
       initialRoute = AppRouter.userSetup;
       print('Going to user setup screen');
     } else {
-      initialRoute = AppRouter.dashboard;
-      print('Going to dashboard screen');
+      // Use the splash route for biometric authentication
+      initialRoute = AppRouter.splash;
+      print('Going to splash screen for authentication');
     }
     
     print('Starting app with route: $initialRoute');
@@ -252,6 +266,13 @@ Future<void> main() async {
           ChangeNotifierProvider(create: (_) => ThemeProvider()),
           ChangeNotifierProvider(create: (_) => AuthProvider()..initialize()),
           ChangeNotifierProvider(create: (_) => UserProfileProvider()..initialize()),
+          ChangeNotifierProvider(create: (context) {
+            // Access the UserProfileProvider to ensure it's initialized first
+            final userProfileProvider = Provider.of<UserProfileProvider>(context, listen: false);
+            // Set context for the UserProfileProvider
+            userProfileProvider.setContext(context);
+            return CurrencyProvider();
+          }),
           Provider<UserRepository>(create: (_) => userRepository),
           Provider<CategoryRepository>(create: (_) => CategoryRepository()),
           Provider<TransactionRepository>.value(value: transactionRepository),
@@ -386,6 +407,9 @@ void _registerHiveAdapters() {
       print('Registering AccountModelAdapter...');
       Hive.registerAdapter(AccountModelAdapter());
     });
+    
+    // Override the account model adapter with our custom implementation for proper type handling
+    _unregisterAndRegisterAdapter('AccountModel', CustomAccountModelAdapter());
     
     _safeRegisterAdapter(() {
       print('Registering TransactionModelAdapter...');
@@ -788,4 +812,19 @@ Future<void> generateAppIcon() async {
   // No need to generate icons since we're now using the asset
   // The flutter_launcher_icons package will handle creating appropriate sized 
   // versions for different platforms during the build process.
+}
+
+// Add a helper to override existing adapters
+void _unregisterAndRegisterAdapter<T>(String name, TypeAdapter<T> adapter) {
+  print('Overriding adapter for $name...');
+  try {
+    if (Hive.isAdapterRegistered(adapter.typeId)) {
+      // Note: Hive doesn't have a clean way to unregister adapters, but we can replace them
+      print('Adapter with typeId ${adapter.typeId} was already registered, replacing it');
+    }
+    Hive.registerAdapter(adapter, override: true);
+    print('Successfully registered adapter for $name');
+  } catch (e) {
+    print('Error while registering adapter for $name: $e');
+  }
 }
