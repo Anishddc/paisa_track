@@ -13,6 +13,14 @@ import 'package:paisa_track/data/services/backup_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
 import '../../../data/services/update_service.dart';
+import '../../../services/auth_service.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter/rendering.dart';
+import 'package:paisa_track/core/utils/currency_utils.dart';
+import 'package:paisa_track/data/services/profile_fix_service.dart';
+import 'package:paisa_track/providers/currency_provider.dart';
+import 'package:provider/provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -122,6 +130,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+        // Add the footer as bottomNavigationBar to ensure it stays at the bottom
+        bottomNavigationBar: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            border: Border(
+              top: BorderSide(
+                color: Colors.grey.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+          ),
+          child: const Text(
+            'Made with ❤️ in Nepal',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : ListView(
@@ -145,40 +176,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 24),
                 ],
               ),
-        bottomNavigationBar: BottomAppBar(
-          shape: const CircularNotchedRectangle(),
-          notchMargin: 8.0,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.dashboard),
-                onPressed: () {
-                  Navigator.pushNamed(context, AppRouter.dashboard);
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.account_balance_wallet),
-                onPressed: () {
-                  Navigator.pushNamed(context, AppRouter.accounts);
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.category),
-                onPressed: () {
-                  Navigator.pushNamed(context, AppRouter.categories);
-                },
-              ),
-              const SizedBox(width: 40), // Space for FAB
-              IconButton(
-                icon: const Icon(Icons.bar_chart),
-                onPressed: () {
-                  Navigator.pushNamed(context, AppRouter.reports);
-                },
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -355,6 +352,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _showCurrencySelector();
           },
         ),
+        
         ListTile(
           leading: const Icon(Icons.language),
           title: const Text('Language'),
@@ -552,37 +550,161 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ),
-        ListTile(
-          leading: const Icon(Icons.favorite),
-          title: const Text('Support Development'),
-          subtitle: const Text('Help us improve Paisa Track'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            // TODO: Implement donation options
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Donation options coming soon!'),
+        // Developer Support Card
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                ColorConstants.primaryColor.withOpacity(0.1),
+                ColorConstants.primaryColor.withOpacity(0.05),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: ColorConstants.primaryColor.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: ColorConstants.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.code,
+                    color: ColorConstants.primaryColor,
+                  ),
+                ),
+                title: const Text(
+                  'Developer Support',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Aneesh (Ozric)',
+                  style: TextStyle(
+                    fontSize: 14,
+                  ),
+                ),
               ),
-            );
-          },
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Support the development of Paisa Track',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // eSewa Payment Button
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    // TODO: Implement eSewa payment
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('eSewa payment coming soon!'),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.payment),
+                  label: const Text('Support via eSewa'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ColorConstants.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              // eSewa Number Display
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.phone, size: 16),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'eSewa: 9865236409',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        ListTile(
-          leading: const Icon(Icons.share),
-          title: const Text('Share App'),
-          subtitle: const Text('Tell others about Paisa Track'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            _shareApp();
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.feedback),
-          title: const Text('Send Feedback'),
-          subtitle: const Text('Help us improve with your suggestions'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            _showFeedbackDialog();
-          },
+        // Share App Card
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.green.withOpacity(0.1),
+                Colors.green.withOpacity(0.05),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.green.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          child: ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.share,
+                color: Colors.green,
+              ),
+            ),
+            title: const Text(
+              'Share App',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            subtitle: const Text(
+              'Tell others about Paisa Track',
+              style: TextStyle(
+                fontSize: 14,
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _shareApp,
+          ),
         ),
       ],
     );
@@ -608,6 +730,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
             Navigator.pushNamed(context, AppRouter.about);
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.update),
+          title: const Text('Check for Updates'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () async {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Checking for updates...'),
+                duration: Duration(seconds: 1),
+              ),
+            );
+            // Import the update service and force check for updates
+            await UpdateService.checkForUpdates(context, force: true);
           },
         ),
         ListTile(
@@ -679,6 +816,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showCurrencySelector() {
+    _showFullCurrencySelector();
+  }
+  
+  void _showFullCurrencySelector() {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -763,10 +904,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _toggleBiometricAuthentication(bool value) async {
+  Future<void> _toggleBiometricAuthentication(bool value) async {
     if (_userProfile == null) return;
     
     try {
+      // If enabling biometric auth, first check if it's available
+      if (value) {
+        final authService = AuthService();
+        final isAvailable = await authService.isBiometricAvailable();
+        
+        if (!isAvailable) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Biometric authentication is not available on this device'),
+                backgroundColor: ColorConstants.errorColor,
+              ),
+            );
+          }
+          return;
+        }
+        
+        // Test biometric authentication before enabling
+        final authResult = await authService.authenticateWithBiometrics();
+        if (!authResult['success']) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(authResult['message'] ?? 'Failed to authenticate. Please try again.'),
+                backgroundColor: ColorConstants.errorColor,
+              ),
+            );
+          }
+          return;
+        }
+      }
+      
       // Create updated user profile with the new biometric setting
       final updatedProfile = _userProfile!.copyWith(
         isBiometricEnabled: value,
@@ -2173,14 +2346,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _shareApp() {
-    // Mock implementation - would use share package in real app
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Sharing Paisa Track with friends...'),
-        backgroundColor: ColorConstants.successColor,
-      ),
-    );
+  void _shareApp() async {
+    try {
+      // Get app info
+      final packageInfo = await PackageInfo.fromPlatform();
+      final appName = packageInfo.appName;
+      final version = packageInfo.version;
+      
+      // Create share message with platform-specific details
+      final shareMessage = 'Check out $appName v$version - Your personal finance manager!\n\n'
+          'I\'ve been using $appName to manage my finances and track expenses. '
+          'It helps me stay on top of my money with a clean and simple interface.\n\n'
+          'Get it from our GitHub: https://github.com/aneesh/paisa_track\n\n'
+          'Developed with ❤️ in Nepal by Aneesh (Ozric)\n'
+          'eSewa: 9865236409';
+      
+      // Handle sharing with position origin for iPad compatibility
+      final box = context.findRenderObject() as RenderBox?;
+      
+      // Show share dialog
+      final result = await Share.share(
+        shareMessage,
+        subject: 'Check out $appName - Your personal finance manager!',
+        sharePositionOrigin: box != null 
+            ? box.localToGlobal(Offset.zero) & box.size
+            : null,
+      );
+      
+      // Handle share result
+      if (result.status == ShareResultStatus.success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Thanks for sharing Paisa Track!'),
+              backgroundColor: ColorConstants.successColor,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sharing app: $e'),
+            backgroundColor: ColorConstants.errorColor,
+          ),
+        );
+      }
+    }
   }
 
   void _showFeedbackDialog() {
@@ -2539,6 +2752,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     }
   }
+
+  void _forceFixNepaliCurrency() async {
+    final profileFixService = ProfileFixService();
+    
+    // First try logging profile information
+    await profileFixService.logProfileInfo();
+    
+    try {
+      // Force update to NPR
+      final updated = await profileFixService.forceUpdateToNPR();
+      
+      if (mounted) {
+        if (updated) {
+          // Update the CurrencyProvider directly
+          final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+          currencyProvider.updateCurrency('NPR');
+          
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Currency successfully updated to Nepali Rupees (रू)'),
+              backgroundColor: ColorConstants.successColor,
+            ),
+          );
+          
+          // Reload user profile
+          _loadUserProfile();
+        } else {
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to update currency. Please try again.'),
+              backgroundColor: ColorConstants.errorColor,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating currency: $e'),
+            backgroundColor: ColorConstants.errorColor,
+          ),
+        );
+      }
+    }
+  }
 }
 
 class CountrySelectionDialog extends StatefulWidget {
@@ -2690,13 +2951,15 @@ class CurrencySelectionDialog extends StatefulWidget {
 class _CurrencySelectionDialogState extends State<CurrencySelectionDialog> {
   late String _selectedCurrencyCode;
   final _searchController = TextEditingController();
-  List<CurrencyType> _filteredCurrencies = [];
+  List<Currency> _allCurrencies = [];
+  List<Currency> _filteredCurrencies = [];
   
   @override
   void initState() {
     super.initState();
     _selectedCurrencyCode = widget.initialCurrencyCode;
-    _filteredCurrencies = CurrencyType.values;
+    _allCurrencies = CurrencyUtils.getCommonCurrencies();
+    _filteredCurrencies = _allCurrencies;
   }
   
   @override
@@ -2708,16 +2971,16 @@ class _CurrencySelectionDialogState extends State<CurrencySelectionDialog> {
   void _filterCurrencies(String query) {
     if (query.isEmpty) {
       setState(() {
-        _filteredCurrencies = CurrencyType.values;
+        _filteredCurrencies = _allCurrencies;
       });
       return;
     }
     
     setState(() {
-      _filteredCurrencies = CurrencyType.values
+      _filteredCurrencies = _allCurrencies
           .where((currency) => 
-            currency.displayName.toLowerCase().contains(query.toLowerCase()) ||
-            currency.name.toUpperCase().contains(query.toUpperCase()))
+            currency.name.toLowerCase().contains(query.toLowerCase()) ||
+            currency.code.toUpperCase().contains(query.toUpperCase()))
           .toList();
     });
   }
@@ -2764,8 +3027,7 @@ class _CurrencySelectionDialogState extends State<CurrencySelectionDialog> {
                 itemCount: _filteredCurrencies.length,
                 itemBuilder: (context, index) {
                   final currency = _filteredCurrencies[index];
-                  final currencyCode = currency.name.toUpperCase();
-                  final isSelected = currencyCode == _selectedCurrencyCode;
+                  final isSelected = currency.code == _selectedCurrencyCode;
                   
                   return ListTile(
                     leading: Container(
@@ -2782,16 +3044,16 @@ class _CurrencySelectionDialogState extends State<CurrencySelectionDialog> {
                         ),
                       ),
                     ),
-                    title: Text(currency.displayName),
-                    subtitle: Text(currencyCode),
+                    title: Text(currency.name),
+                    subtitle: Text(currency.code),
                     trailing: isSelected ? const Icon(Icons.check, color: ColorConstants.primaryColor) : null,
                     onTap: () {
                       setState(() {
-                        _selectedCurrencyCode = currencyCode;
+                        _selectedCurrencyCode = currency.code;
                       });
                       
                       // Update the selected currency
-                      widget.onSelect(currencyCode);
+                      widget.onSelect(currency.code);
                       
                       // Close the dialog
                       Navigator.of(context).pop();
