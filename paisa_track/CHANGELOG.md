@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.0-beta.5+5 (2025-04-10)
+
+### Added
+- Complete currency conversion functionality
+- Currency converter utility for accurately converting between currencies
+- Support for storing and displaying transaction amounts in their original currency
+- Enhanced transaction details screen showing both original and converted amounts
+
+### Fixed
+- Fixed issue where changing currency would display amounts as 0
+- Fixed currency display inconsistencies across the app
+- Ensured transaction amounts maintain their value when currency is changed
+
+### Changed
+- Improved transaction repository to store currency information
+- Updated CurrencyProvider to handle currency conversion more effectively
+- Enhanced notification system with comprehensive notification management
+
 ## 1.0.0-beta.2+2 (2025-03-25)
 
 ### Added
