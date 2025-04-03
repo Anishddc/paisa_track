@@ -1,22 +1,76 @@
 # Changelog
 
-## 1.0.0-beta.5+5 (2025-04-10)
+## [Unreleased]
 
 ### Added
-- Complete currency conversion functionality
-- Currency converter utility for accurately converting between currencies
-- Support for storing and displaying transaction amounts in their original currency
-- Enhanced transaction details screen showing both original and converted amounts
+- Added swipe-to-edit (right) and swipe-to-delete (left) functionality for loans
+- Improved loan card UI with dismissible actions and confirmation dialogs
+- Made bank account selection optional when adding loans
+- Added ability to enter custom bank/lender names when no account is selected
+- Modernized Bills screen UI with enhanced design and interaction patterns
+- Added swipe-to-edit and swipe-to-delete functionality for bills
 
 ### Fixed
-- Fixed issue where changing currency would display amounts as 0
-- Fixed currency display inconsistencies across the app
-- Ensured transaction amounts maintain their value when currency is changed
+- **Critical Bill Management Fixes**:
+  - Fixed "Cannot write, unknown type: BillModel" error when adding bills
+  - Implemented robust BillModelAdapter registration with enhanced error handling
+  - Created CustomBillModelAdapter as a fallback solution for serialization issues
+  - Fixed BillModel type registration in Hive by ensuring adapter registration order
+  - Added robust field-by-field error handling in custom adapter
+  - Optimized adapter registration sequence to handle dependencies properly
+  - Added detailed error reporting for adapter registration problems
+  - Created test utility to verify bill creation and storage functionality
+
+- **Loan Management Fixes**:
+  - Fixed provider access issues in LoanDetailsScreen
+  - Added proper error handling for loan payment operations
+  - Improved UI feedback for error states
+  - Fixed null safety issues with loan data access
+
+- **Repository and Provider Fixes**:
+  - Fixed initialization issues with BillRepository
+  - Added proper null checking in DatabaseService
+  - Improved provider state management across screens
+  - Enhanced error reporting for repository operations
 
 ### Changed
-- Improved transaction repository to store currency information
-- Updated CurrencyProvider to handle currency conversion more effectively
-- Enhanced notification system with comprehensive notification management
+- Updated UI components across bill and loan screens
+- Improved error messaging and user feedback
+- Enhanced database integrity verification
+
+## 1.0.0-beta.6+6 (April 3, 2025)
+
+### New Features
+- **Transaction History Export**: Added PDF export functionality for transaction history
+  - Customizable date range selection
+  - Filtering by transaction type, category, and account
+  - PDF includes summary statistics and detailed transaction list
+  - User details in PDF export for personalization
+  - Support for downloading or sharing the generated PDF
+
+### Improvements
+- **All Transactions Screen**: Completely redesigned top bar with improved UI
+  - Modern date range filter with intuitive date picker
+  - Enhanced filter chips with better visual design
+  - Improved search functionality
+  - More consistent display of transaction data
+  - Proper currency symbol display based on user settings
+
+### Bug Fixes
+- Fixed incorrect currency symbol in transaction list
+- Resolved routing issues with transaction export screen
+- Fixed PDF export currency display issues for non-Latin characters
+- Added proper handling of special currency symbols in PDF exports
+
+## 1.0.0-beta.5+5 (March 15, 2025)
+
+### Initial Beta Release
+- Core financial tracking functionality
+- Transaction management
+- Account management
+- Budget tracking
+- Category management
+- Basic reporting features
 
 ## 1.0.0-beta.2+2 (2025-03-25)
 
@@ -42,4 +96,8 @@
 - Transaction tracking
 - Multiple account support
 - Category management
-- Basic reporting 
+- Basic reporting
+
+## [Previous Versions]
+
+<!-- Previous changelog entries go here --> 

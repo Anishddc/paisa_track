@@ -1,30 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:paisa_track/data/models/account_model.dart';
+import 'package:paisa_track/data/models/category_model.dart';
 import 'package:paisa_track/data/models/enums/transaction_type.dart';
+import 'package:paisa_track/data/models/loan_model.dart';
 import 'package:paisa_track/presentation/screens/accounts/account_details_screen.dart';
 import 'package:paisa_track/presentation/screens/accounts/accounts_screen.dart';
+import 'package:paisa_track/presentation/screens/accounts/add_account_screen.dart';
+import 'package:paisa_track/presentation/screens/accounts/edit_account_screen.dart';
 import 'package:paisa_track/presentation/screens/bills/bills_screen.dart';
 import 'package:paisa_track/presentation/screens/budgets/budget_screen.dart';
 import 'package:paisa_track/presentation/screens/categories/categories_screen.dart';
 import 'package:paisa_track/presentation/screens/categories/category_add_edit_screen.dart';
+import 'package:paisa_track/presentation/screens/categories/category_details_screen.dart';
 import 'package:paisa_track/presentation/screens/dashboard/dashboard_screen.dart';
 import 'package:paisa_track/presentation/screens/goals/goals_screen.dart';
 import 'package:paisa_track/presentation/screens/loans/loans_screen.dart';
+import 'package:paisa_track/presentation/screens/loans/add_loan_screen.dart';
+import 'package:paisa_track/presentation/screens/loans/loan_details_screen.dart';
+import 'package:paisa_track/presentation/screens/loans/add_loan_payment_screen.dart';
 import 'package:paisa_track/presentation/screens/onboarding/onboarding_screen.dart';
 import 'package:paisa_track/presentation/screens/recurring/recurring_screen.dart';
+import 'package:paisa_track/presentation/screens/recurring/recurring_transactions_screen.dart';
+import 'package:paisa_track/presentation/screens/recurring/add_edit_recurring_transaction.dart';
 import 'package:paisa_track/presentation/screens/reports/reports_screen.dart';
 import 'package:paisa_track/presentation/screens/scan/receipt_scanner_screen.dart';
 import 'package:paisa_track/presentation/screens/settings/settings_screen.dart';
+import 'package:paisa_track/presentation/screens/settings/modern_settings_screen.dart';
+import 'package:paisa_track/presentation/screens/settings/currency_settings_screen.dart';
+import 'package:paisa_track/presentation/screens/splash_screen.dart';
 import 'package:paisa_track/presentation/screens/transactions/add_transaction_screen.dart';
 import 'package:paisa_track/presentation/screens/transactions/all_transactions_screen.dart';
 import 'package:paisa_track/presentation/screens/transactions/transaction_details_screen.dart';
 import 'package:paisa_track/presentation/screens/transactions/transaction_statistics_screen.dart';
+import 'package:paisa_track/presentation/screens/transactions/transaction_history_export_screen.dart';
 import 'package:paisa_track/presentation/screens/user_setup/user_setup_screen.dart';
 import 'package:paisa_track/presentation/screens/about/about_screen.dart';
+import 'package:paisa_track/presentation/screens/bills/add_bill_screen.dart';
+import 'package:paisa_track/presentation/screens/bills/edit_bill_screen.dart';
+import 'package:paisa_track/presentation/screens/bills/bill_details_screen.dart';
+import 'package:paisa_track/presentation/screens/settings/privacy_settings_screen.dart';
+import 'package:paisa_track/presentation/screens/settings/profile_edit_screen.dart';
+import 'package:paisa_track/presentation/screens/settings/support_screen.dart';
+import 'package:paisa_track/presentation/screens/settings/terms_policy_screen.dart';
+import 'package:paisa_track/presentation/screens/settings/notification_settings_screen.dart';
+import 'package:paisa_track/presentation/screens/settings/notification_test_screen.dart';
+import 'package:paisa_track/tests/biometric_test.dart';
+import 'package:paisa_track/presentation/screens/settings/backup_restore_screen.dart';
 
 class AppRouter {
   static const String onboarding = '/onboarding';
   static const String userSetup = '/user-setup';
+  static const String splash = '/splash';
   static const String dashboard = '/';
   static const String accounts = '/accounts';
   static const String accountDetails = '/accounts/details';
@@ -34,16 +60,40 @@ class AppRouter {
   static const String transactionDetails = '/transactions/details';
   static const String addTransaction = '/transactions/add';
   static const String transactionStatistics = '/transactions/statistics';
+  static const String transactionHistoryExport = '/transaction-history-export';
   static const String settingsRoute = '/settings';
+  static const String modernSettingsRoute = '/settings/modern';
+  static const String privacySettingsRoute = '/settings/privacy';
+  static const String profileEditRoute = '/settings/profile-edit';
+  static const String supportRoute = '/settings/support';
+  static const String termsAndPolicyRoute = '/settings/terms-privacy';
+  static const String notificationSettingsRoute = '/settings/notifications';
+  static const String notificationTestRoute = '/settings/notifications/test';
+  static const String currencySettingsRoute = '/settings/currency';
   static const String budgets = '/budgets';
   static const String goals = '/goals';
   static const String loans = '/loans';
+  static const String addLoanScreen = '/loans/add';
+  static const String loanDetailsScreen = '/loans/details';
+  static const String addLoanPaymentScreen = '/loans/payment/add';
+  static const String addAccountScreen = '/accounts/add';
   static const String recurring = '/recurring';
+  static const String recurringTransactions = '/recurring/transactions';
+  static const String addRecurringTransaction = '/recurring/transactions/add';
+  static const String editRecurringTransaction = '/recurring/transactions/edit';
   static const String scanReceipt = '/scan-receipt';
   static const String bills = '/bills';
   static const String currencyConverter = '/currency-converter';
   static const String reports = '/reports';
   static const String about = '/about';
+  static const String billsScreen = '/bills';
+  static const String addBill = '/bills/add';
+  static const String editBill = '/bills/edit';
+  static const String billDetails = '/bills/details';
+  static const String tags = '/tags';
+  static const String analytics = '/analytics';
+  static const String biometricTestRoute = '/biometric_test';
+  static const String backupRestoreRoute = '/settings/backup-restore';
   
   static Map<String, WidgetBuilder> routes = {
     dashboard: (_) => const DashboardScreen(),
@@ -51,19 +101,37 @@ class AppRouter {
     categories: (_) => const CategoriesScreen(),
     allTransactions: (_) => const AllTransactionsScreen(),
     transactionStatistics: (_) => const TransactionStatisticsScreen(),
-    settingsRoute: (_) => const SettingsScreen(),
+    transactionHistoryExport: (_) => const TransactionHistoryExportScreen(),
+    settingsRoute: (_) => const ModernSettingsScreen(),
+    modernSettingsRoute: (_) => const ModernSettingsScreen(),
+    privacySettingsRoute: (_) => const PrivacySettingsScreen(),
+    profileEditRoute: (_) => const ProfileEditScreen(),
+    supportRoute: (_) => const SupportScreen(),
+    termsAndPolicyRoute: (_) => const TermsAndPolicyScreen(),
+    notificationSettingsRoute: (_) => const NotificationSettingsScreen(),
+    notificationTestRoute: (_) => const NotificationTestScreen(),
+    currencySettingsRoute: (_) => const CurrencySettingsScreen(),
     budgets: (_) => const BudgetScreen(),
     goals: (_) => const GoalsScreen(),
-    loans: (_) => const LoansScreen(),
+    loans: (context) => LoansScreen.builder(context),
     recurring: (_) => const RecurringScreen(),
+    recurringTransactions: (_) => const RecurringTransactionsScreen(),
     scanReceipt: (_) => const ReceiptScannerScreen(),
-    bills: (_) => const BillsScreen(),
-    currencyConverter: (context) => Scaffold(
-      appBar: AppBar(title: const Text('Currency Converter')),
-      body: const Center(child: Text('Currency Converter coming soon!')),
-    ),
+    bills: (context) => BillsScreen.builder(context),
+    splash: (_) => const SplashScreen(),
+    currencyConverter: (context) => const CurrencySettingsScreen(),
     reports: (_) => const ReportsScreen(),
     about: (_) => const AboutScreen(),
+    tags: (context) => Scaffold(
+      appBar: AppBar(title: const Text('Tags')),
+      body: const Center(child: Text('Tags feature coming soon!')),
+    ),
+    analytics: (context) => Scaffold(
+      appBar: AppBar(title: const Text('Analytics')),
+      body: const Center(child: Text('Analytics feature coming soon!')),
+    ),
+    biometricTestRoute: (_) => const BiometricTestScreen(),
+    backupRestoreRoute: (_) => const BackupRestoreScreen(),
   };
 
   static Route<dynamic> generateRoute(RouteSettings routeSettings) {
@@ -80,6 +148,11 @@ class AppRouter {
       case userSetup:
         return MaterialPageRoute(
           builder: (_) => const UserSetupScreen(),
+        );
+        
+      case splash:
+        return MaterialPageRoute(
+          builder: (_) => const SplashScreen(),
         );
         
       case dashboard:
@@ -160,17 +233,69 @@ class AppRouter {
           builder: (_) => const TransactionStatisticsScreen(),
         );
         
+      case transactionHistoryExport:
+        return MaterialPageRoute(
+          builder: (_) => const TransactionHistoryExportScreen(),
+        );
+        
       case settingsRoute:
         if (fromTab) {
           return MaterialPageRoute(
-            builder: (_) => const SettingsScreen(),
+            builder: (_) => const ModernSettingsScreen(),
             maintainState: true,
           );
         } else {
           return MaterialPageRoute(
-            builder: (_) => const SettingsScreen(),
+            builder: (_) => const ModernSettingsScreen(),
           );
         }
+        
+      case modernSettingsRoute:
+        if (fromTab) {
+          return MaterialPageRoute(
+            builder: (_) => const ModernSettingsScreen(),
+            maintainState: true,
+          );
+        } else {
+          return MaterialPageRoute(
+            builder: (_) => const ModernSettingsScreen(),
+          );
+        }
+        
+      case privacySettingsRoute:
+        return MaterialPageRoute(
+          builder: (_) => const PrivacySettingsScreen(),
+        );
+        
+      case profileEditRoute:
+        return MaterialPageRoute(
+          builder: (_) => const ProfileEditScreen(),
+        );
+        
+      case supportRoute:
+        return MaterialPageRoute(
+          builder: (_) => const SupportScreen(),
+        );
+        
+      case termsAndPolicyRoute:
+        return MaterialPageRoute(
+          builder: (_) => const TermsAndPolicyScreen(),
+        );
+        
+      case notificationSettingsRoute:
+        return MaterialPageRoute(
+          builder: (_) => const NotificationSettingsScreen(),
+        );
+        
+      case notificationTestRoute:
+        return MaterialPageRoute(
+          builder: (_) => const NotificationTestScreen(),
+        );
+        
+      case currencySettingsRoute:
+        return MaterialPageRoute(
+          builder: (_) => const CurrencySettingsScreen(),
+        );
         
       case budgets:
         return MaterialPageRoute(
@@ -184,12 +309,28 @@ class AppRouter {
         
       case loans:
         return MaterialPageRoute(
-          builder: (_) => const LoansScreen(),
+          builder: (context) => LoansScreen.builder(context),
         );
         
       case recurring:
         return MaterialPageRoute(
           builder: (_) => const RecurringScreen(),
+        );
+        
+      case recurringTransactions:
+        return MaterialPageRoute(
+          builder: (_) => const RecurringTransactionsScreen(),
+        );
+        
+      case addRecurringTransaction:
+        return MaterialPageRoute(
+          builder: (_) => const AddEditRecurringTransactionScreen(),
+        );
+        
+      case editRecurringTransaction:
+        final transactionId = args as String;
+        return MaterialPageRoute(
+          builder: (_) => AddEditRecurringTransactionScreen(transactionId: transactionId),
         );
         
       case scanReceipt:
@@ -199,32 +340,74 @@ class AppRouter {
         
       case bills:
         return MaterialPageRoute(
-          builder: (_) => const BillsScreen(),
+          builder: (context) => BillsScreen.builder(context),
+        );
+        
+      case reports:
+        return MaterialPageRoute(
+          builder: (_) => const ReportsScreen(),
         );
         
       case currencyConverter:
         return MaterialPageRoute(
-          builder: (context) => Scaffold(
-            appBar: AppBar(title: const Text('Currency Converter')),
-            body: const Center(child: Text('Currency Converter coming soon!')),
-          ),
+          builder: (_) => const CurrencySettingsScreen(),
         );
-        
-      case reports:
-        if (fromTab) {
-          return MaterialPageRoute(
-            builder: (_) => const ReportsScreen(),
-            maintainState: true,
-          );
-        } else {
-          return MaterialPageRoute(
-            builder: (_) => const ReportsScreen(),
-          );
-        }
         
       case about:
         return MaterialPageRoute(
           builder: (_) => const AboutScreen(),
+        );
+        
+      case tags:
+        return MaterialPageRoute(
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: const Text('Tags')),
+            body: const Center(child: Text('Tags feature coming soon!')),
+          ),
+        );
+        
+      case analytics:
+        return MaterialPageRoute(
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: const Text('Analytics')),
+            body: const Center(child: Text('Analytics feature coming soon!')),
+          ),
+        );
+        
+      case billsScreen:
+        return MaterialPageRoute(builder: (context) => BillsScreen.builder(context));
+      
+      case addBill:
+        return MaterialPageRoute(builder: (context) => AddBillScreen.builder(context));
+      
+      case editBill:
+        final billId = args as String;
+        return MaterialPageRoute(builder: (context) => EditBillScreen.builder(context, billId));
+      
+      case billDetails:
+        final billId = args as String;
+        return MaterialPageRoute(builder: (context) => BillDetailsScreen.builder(context, billId));
+        
+      case addLoanScreen:
+        return MaterialPageRoute(builder: (_) => const AddLoanScreen());
+      
+      case loanDetailsScreen:
+        final loanId = args as String;
+        return MaterialPageRoute(builder: (context) => LoanDetailsScreen.builder(context, loanId));
+      
+      case addLoanPaymentScreen:
+        final loanId = args as String;
+        return MaterialPageRoute(builder: (context) => AddLoanPaymentScreen.builder(context, loanId));
+      
+      case addAccountScreen:
+        return MaterialPageRoute(builder: (_) => const AddAccountScreen());
+        
+      case biometricTestRoute:
+        return MaterialPageRoute(builder: (_) => const BiometricTestScreen());
+        
+      case backupRestoreRoute:
+        return MaterialPageRoute(
+          builder: (_) => const BackupRestoreScreen(),
         );
         
       default:
