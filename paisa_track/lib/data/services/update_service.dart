@@ -11,12 +11,9 @@ import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UpdateService {
-  // TODO: Update these with your actual GitHub repository details
-  static const String _githubUsername = 'Anishddc';
-  static const String _githubRepo = 'paisa_track';
-  
-  static String get _githubApiUrl => 'https://api.github.com/repos/$_githubUsername/$_githubRepo/releases';
-  static String get _githubReleaseUrl => 'https://github.com/$_githubUsername/$_githubRepo/releases';
+  // Update these with your actual GitHub repository details
+  static const String _githubUsername = 'Anishddc';  // Replace with your actual GitHub username
+  static const String _githubRepo = 'paisa_track';  // Replace with your actual repository name
   
   // Cooldown period for update checks (24 hours)
   static const Duration _updateCheckCooldown = Duration(hours: 24);
@@ -24,14 +21,99 @@ class UpdateService {
   // Key for storing last update check time
   static const String _lastUpdateCheckKey = 'last_update_check_time';
   
+  // Key for disabling update checks
+  static const String _updateChecksEnabledKey = 'update_checks_enabled';
+  
+  // Key for storing GitHub repo details
+  static const String _githubUsernameKey = 'github_username';
+  static const String _githubRepoKey = 'github_repo';
+  
+  // Get configured GitHub username (with fallback to default)
+  static Future<String> getGithubUsername() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_githubUsernameKey) ?? _githubUsername;
+  }
+  
+  // Get configured GitHub repo name (with fallback to default)
+  static Future<String> getGithubRepo() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_githubRepoKey) ?? _githubRepo;
+  }
+  
+  // Save custom GitHub details
+  static Future<void> saveGithubDetails(String username, String repo) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_githubUsernameKey, username);
+    await prefs.setString(_githubRepoKey, repo);
+  }
+  
+  // Get GitHub API URL with current settings
+  static Future<String> getGithubApiUrl() async {
+    final username = await getGithubUsername();
+    final repo = await getGithubRepo();
+    return 'https://api.github.com/repos/$username/$repo/releases';
+  }
+  
+  // Get GitHub releases URL with current settings
+  static Future<String> getGithubReleaseUrl() async {
+    final username = await getGithubUsername();
+    final repo = await getGithubRepo();
+    return 'https://github.com/$username/$repo/releases';
+  }
+  
+  // Verify if configured GitHub repository exists and is accessible
+  static Future<bool> verifyGithubRepository() async {
+    try {
+      final username = await getGithubUsername();
+      final repo = await getGithubRepo();
+      final repoUrl = 'https://api.github.com/repos/$username/$repo';
+      
+      debugPrint('Verifying GitHub repository: $repoUrl');
+      
+      final response = await http.get(
+        Uri.parse(repoUrl),
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'PaisaTrack-App',
+        },
+      ).timeout(const Duration(seconds: 10));
+      
+      final isValid = response.statusCode == 200;
+      debugPrint('GitHub repository verification ${isValid ? 'successful' : 'failed'}: ${response.statusCode}');
+      
+      return isValid;
+    } catch (e) {
+      debugPrint('Error verifying GitHub repository: $e');
+      return false;
+    }
+  }
+  
   static Future<bool> shouldCheckForUpdates() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // Check if updates are enabled
+    final updatesEnabled = prefs.getBool(_updateChecksEnabledKey) ?? true;
+    if (!updatesEnabled) {
+      debugPrint('Update checks are disabled by user preference');
+      return false;
+    }
+    
     final lastCheckTime = DateTime.fromMillisecondsSinceEpoch(
       prefs.getInt(_lastUpdateCheckKey) ?? 0
     );
     
     final now = DateTime.now();
     return now.difference(lastCheckTime) > _updateCheckCooldown;
+  }
+  
+  static Future<void> setUpdateChecksEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_updateChecksEnabledKey, enabled);
+  }
+  
+  static Future<bool> areUpdateChecksEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_updateChecksEnabledKey) ?? true;
   }
   
   static Future<void> updateLastCheckTime() async {
@@ -45,26 +127,49 @@ class UpdateService {
       
       // Check if we should perform the update check
       if (!force && !await shouldCheckForUpdates()) {
-        debugPrint('Skipping update check - cooldown period not elapsed');
+        debugPrint('Skipping update check - cooldown period not elapsed or updates disabled');
         return;
       }
 
-      // First check internet connectivity
+      // First check internet connectivity with multiple reliable domains
       try {
         debugPrint('Checking internet connectivity...');
-        final result = await InternetAddress.lookup('google.com');
-        if (result.isEmpty || result[0].rawAddress.isEmpty) {
-          debugPrint('No internet connection available');
+        // Try multiple domains to increase reliability of connectivity check
+        List<String> domainsToTry = ['google.com', 'github.com', 'apple.com', 'microsoft.com', 'amazon.com'];
+        bool hasInternet = false;
+        
+        for (String domain in domainsToTry) {
+          try {
+            final result = await InternetAddress.lookup(domain)
+                .timeout(const Duration(seconds: 5));
+            if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+              hasInternet = true;
+              debugPrint('Internet connection available (confirmed via $domain)');
+              break;
+            }
+          } catch (e) {
+            debugPrint('Could not connect to $domain: $e');
+            // Continue trying other domains
+          }
+        }
+        
+        if (!hasInternet) {
+          debugPrint('No internet connection available after trying multiple domains');
           if (context.mounted) {
             _showErrorDialog(context, 'No internet connection available. Please check your connection and try again.');
           }
           return;
         }
-        debugPrint('Internet connection available');
-      } on SocketException catch (_) {
-        debugPrint('Socket exception when checking internet connectivity');
+      } on SocketException catch (e) {
+        debugPrint('Socket exception when checking internet connectivity: $e');
         if (context.mounted) {
           _showErrorDialog(context, 'No internet connection available. Please check your connection and try again.');
+        }
+        return;
+      } catch (e) {
+        debugPrint('Error checking internet connectivity: $e');
+        if (context.mounted) {
+          _showErrorDialog(context, 'Could not verify internet connection: ${e.toString()}');
         }
         return;
       }
@@ -74,17 +179,74 @@ class UpdateService {
       String currentVersion = packageInfo.version;
       debugPrint('Current app version: $currentVersion');
       
-      // Get releases from GitHub with timeout and headers
-      debugPrint('Fetching releases from GitHub API: $_githubApiUrl');
-      final response = await http.get(
-        Uri.parse(_githubApiUrl),
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'PaisaTrack-App',
-        },
-      ).timeout(const Duration(seconds: 15));
+      // Get GitHub URL
+      final githubApiUrl = await getGithubApiUrl();
+      debugPrint('Using GitHub API URL: $githubApiUrl');
       
-      debugPrint('GitHub API response status: ${response.statusCode}');
+      // Get releases from GitHub with timeout, retry logic, and headers
+      debugPrint('Fetching releases from GitHub API: $githubApiUrl');
+      
+      // Define parameters for retry
+      const int maxRetries = 3;
+      const Duration initialBackoff = Duration(seconds: 2);
+      
+      http.Response? response;
+      Exception? lastException;
+      
+      // Implement retry logic
+      for (int attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          // Exponential backoff for retries
+          if (attempt > 0) {
+            final backoffDuration = initialBackoff * (attempt * 2);
+            debugPrint('Retry attempt ${attempt + 1}/$maxRetries after ${backoffDuration.inSeconds}s backoff');
+            await Future.delayed(backoffDuration);
+          }
+          
+          response = await http.get(
+            Uri.parse(githubApiUrl),
+            headers: {
+              'Accept': 'application/vnd.github.v3+json',
+              'User-Agent': 'PaisaTrack-App',
+            },
+          ).timeout(const Duration(seconds: 10));
+          
+          // Break the loop if successful
+          if (response.statusCode == 200) {
+            debugPrint('GitHub API request successful on attempt ${attempt + 1}');
+            break;
+          } else {
+            debugPrint('GitHub API returned status code ${response.statusCode} on attempt ${attempt + 1}');
+            // Continue with the next attempt
+          }
+        } on TimeoutException catch (e) {
+          lastException = e;
+          debugPrint('Timeout when fetching from GitHub API on attempt ${attempt + 1}: $e');
+          // Continue with the next attempt
+        } on SocketException catch (e) {
+          lastException = e;
+          debugPrint('Socket exception when fetching from GitHub API on attempt ${attempt + 1}: $e');
+          // Continue with the next attempt
+        } catch (e) {
+          lastException = e is Exception ? e : Exception(e.toString());
+          debugPrint('Error when fetching from GitHub API on attempt ${attempt + 1}: $e');
+          // Continue with the next attempt
+        }
+      }
+      
+      // Handle the case when all attempts failed
+      if (response == null) {
+        debugPrint('All GitHub API request attempts failed');
+        if (context.mounted) {
+          _showErrorDialog(
+            context,
+            'Failed to connect to GitHub. Please check your internet connection and try again later.'
+          );
+        }
+        throw lastException ?? TimeoutException('All GitHub API request attempts failed');
+      }
+      
+      debugPrint('Final GitHub API response status: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         final List<dynamic> releases = json.decode(response.body);
@@ -157,9 +319,14 @@ class UpdateService {
         // Update last check time only if the check was successful
         await updateLastCheckTime();
       } else if (response.statusCode == 404) {
-        debugPrint('No releases found in repository: $_githubUsername/$_githubRepo');
+        final username = await getGithubUsername();
+        final repo = await getGithubRepo();
+        debugPrint('No releases found in repository: $username/$repo');
         if (context.mounted) {
-          _showNoReleasesDialog(context);
+          _showErrorDialog(
+            context,
+            'No releases found in the repository $username/$repo. Please check the repository details in settings.'
+          );
         }
       } else {
         debugPrint('GitHub API response status: ${response.statusCode}');
@@ -389,7 +556,8 @@ class UpdateService {
               child: const Text('View Repository'),
               onPressed: () async {
                 try {
-                  final Uri url = Uri.parse(_githubReleaseUrl);
+                  final githubReleaseUrl = await getGithubReleaseUrl();
+                  final Uri url = Uri.parse(githubReleaseUrl);
                   if (!await launchUrl(
                     url,
                     mode: LaunchMode.externalApplication,
@@ -404,8 +572,9 @@ class UpdateService {
                           action: SnackBarAction(
                             label: 'Copy URL',
                             textColor: Colors.white,
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: _githubReleaseUrl));
+                            onPressed: () async {
+                              final githubReleaseUrl = await getGithubReleaseUrl();
+                              Clipboard.setData(ClipboardData(text: githubReleaseUrl));
                             },
                           ),
                         ),
@@ -426,8 +595,9 @@ class UpdateService {
                         action: SnackBarAction(
                           label: 'Copy URL',
                           textColor: Colors.white,
-                          onPressed: () {
-                            Clipboard.setData(ClipboardData(text: _githubReleaseUrl));
+                          onPressed: () async {
+                            final githubReleaseUrl = await getGithubReleaseUrl();
+                            Clipboard.setData(ClipboardData(text: githubReleaseUrl));
                           },
                         ),
                       ),

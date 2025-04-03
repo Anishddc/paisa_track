@@ -44,6 +44,7 @@ import 'package:paisa_track/presentation/screens/settings/support_screen.dart';
 import 'package:paisa_track/presentation/screens/settings/terms_policy_screen.dart';
 import 'package:paisa_track/presentation/screens/settings/notification_settings_screen.dart';
 import 'package:paisa_track/presentation/screens/settings/notification_test_screen.dart';
+import 'package:paisa_track/presentation/screens/settings/update_settings_screen.dart';
 import 'package:paisa_track/tests/biometric_test.dart';
 import 'package:paisa_track/presentation/screens/settings/backup_restore_screen.dart';
 
@@ -94,6 +95,7 @@ class AppRouter {
   static const String analytics = '/analytics';
   static const String biometricTestRoute = '/biometric_test';
   static const String backupRestoreRoute = '/settings/backup-restore';
+  static const String updateSettingsRoute = '/settings/updates';
   
   static Map<String, WidgetBuilder> routes = {
     dashboard: (_) => const DashboardScreen(),
@@ -111,6 +113,7 @@ class AppRouter {
     notificationSettingsRoute: (_) => const NotificationSettingsScreen(),
     notificationTestRoute: (_) => const NotificationTestScreen(),
     currencySettingsRoute: (_) => const CurrencySettingsScreen(),
+    updateSettingsRoute: (_) => const UpdateSettingsScreen(),
     budgets: (_) => const BudgetScreen(),
     goals: (_) => const GoalsScreen(),
     loans: (context) => LoansScreen.builder(context),
@@ -295,6 +298,11 @@ class AppRouter {
       case currencySettingsRoute:
         return MaterialPageRoute(
           builder: (_) => const CurrencySettingsScreen(),
+        );
+        
+      case updateSettingsRoute:
+        return MaterialPageRoute(
+          builder: (_) => const UpdateSettingsScreen(),
         );
         
       case budgets:

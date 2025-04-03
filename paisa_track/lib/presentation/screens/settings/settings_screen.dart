@@ -21,6 +21,8 @@ import 'package:paisa_track/core/utils/currency_utils.dart';
 import 'package:paisa_track/data/services/profile_fix_service.dart';
 import 'package:paisa_track/providers/currency_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:paisa_track/providers/theme_provider.dart';
+import 'package:paisa_track/presentation/screens/settings/language_selector_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -78,6 +80,282 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Widget _buildModernFooter() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            offset: const Offset(0, -1),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Made with ❤️ in Nepal',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (context, snapshot) {
+              final version = snapshot.hasData ? snapshot.data!.version : '';
+              final buildNumber = snapshot.hasData ? snapshot.data!.buildNumber : '';
+              
+              return Text(
+                'Version $version ($buildNumber)',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkeletonLoader() {
+    return ListView(
+      padding: const EdgeInsets.only(top: 16),
+      children: [
+        // Profile section skeleton
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          height: 140,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                spreadRadius: 0,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const SizedBox(width: 20),
+              _buildShimmer(
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildShimmer(
+                      child: Container(
+                        height: 20,
+                        width: 150,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildShimmer(
+                      child: Container(
+                        height: 12,
+                        width: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildShimmer(
+                      child: Container(
+                        height: 24,
+                        width: 120,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 20),
+            ],
+          ),
+        ),
+        
+        // Section headers and cards
+        for (int i = 0; i < 6; i++) ...[
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _buildShimmer(
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    height: 16,
+                    width: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Settings items
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                for (int j = 0; j < 3; j++) ...[
+                  if (j > 0)
+                    const Divider(height: 1, indent: 56, endIndent: 0),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
+                    child: Row(
+                      children: [
+                        _buildShimmer(
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildShimmer(
+                                child: Container(
+                                  height: 14,
+                                  width: 120,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              _buildShimmer(
+                                child: Container(
+                                  height: 10,
+                                  width: 80,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        _buildShimmer(
+                          child: Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+  
+  Widget _buildShimmer({required Widget child}) {
+    return ShaderMask(
+      blendMode: BlendMode.srcATop,
+      shaderCallback: (bounds) {
+        return LinearGradient(
+          colors: [
+            Colors.grey.shade300,
+            Colors.grey.shade100,
+            Colors.grey.shade300,
+          ],
+          stops: const [
+            0.0,
+            0.5,
+            1.0,
+          ],
+          begin: const Alignment(-1.0, -0.5),
+          end: const Alignment(1.0, 0.5),
+          tileMode: TileMode.mirror,
+        ).createShader(
+          Rect.fromLTWH(
+            0,
+            0,
+            bounds.width,
+            bounds.height,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Check if we're accessed from the bottom navigation tab
@@ -106,12 +384,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return true;
       },
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
-          title: const Text('Settings'),
+          title: Text(
+            'Settings',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 22,
+            ),
+          ),
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  ColorConstants.primaryColor,
+                  ColorConstants.primaryColor.withOpacity(0.8),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(20),
+                bottomRight: Radius.circular(20),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+          ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: true,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(20),
+              bottomRight: Radius.circular(20),
+            ),
+          ),
           // If we came from tab navigation, show a home button instead of back
           leading: fromTab 
               ? IconButton(
-                  icon: const Icon(Icons.home),
+                  icon: const Icon(
+                    Icons.home_rounded,
+                    color: Colors.white,
+                    size: 26,
+                  ),
                   onPressed: () {
                     Navigator.pushReplacementNamed(
                       context,
@@ -120,61 +443,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     );
                   },
                 )
-              : null,
+              : IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back_ios_rounded,
+                    color: Colors.white,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.settings, color: Colors.white),
+              icon: const Icon(
+                Icons.help_outline_rounded,
+                color: Colors.white,
+              ),
               onPressed: () {
-                Navigator.pushNamed(context, AppRouter.settingsRoute);
+                // Show help dialog or navigate to help screen
               },
             ),
           ],
         ),
         // Add the footer as bottomNavigationBar to ensure it stays at the bottom
-        bottomNavigationBar: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            border: Border(
-              top: BorderSide(
-                color: Colors.grey.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-          ),
-          child: const Text(
-            'Made with ❤️ in Nepal',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
+        bottomNavigationBar: _buildModernFooter(),
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                children: [
-                  const SizedBox(height: 16),
-                  _buildProfileSection(),
-                  const Divider(),
-                  _buildAppearanceSection(),
-                  const Divider(),
-                  _buildInterfaceSection(),
-                  const Divider(),
-                  _buildPreferencesSection(),
-                  const Divider(),
-                  _buildSecuritySection(),
-                  const Divider(),
-                  _buildDataSection(),
-                  const Divider(),
-                  _buildSupportSection(),
-                  const Divider(),
-                  _buildAboutSection(),
-                  const SizedBox(height: 24),
-                ],
+            ? SafeArea(child: _buildSkeletonLoader())
+            : SafeArea(
+                child: ListView(
+                  padding: const EdgeInsets.only(top: 16),
+                  children: [
+                    _buildProfileSection(),
+                    const SizedBox(height: 8),
+                    _buildAppearanceSection(),
+                    const SizedBox(height: 8),
+                    _buildInterfaceSection(),
+                    const SizedBox(height: 8),
+                    _buildPreferencesSection(),
+                    const SizedBox(height: 8),
+                    _buildSecuritySection(),
+                    const SizedBox(height: 8),
+                    _buildDataSection(),
+                    const SizedBox(height: 8),
+                    _buildSupportSection(),
+                    const SizedBox(height: 8),
+                    _buildAboutSection(),
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
       ),
     );
@@ -183,134 +496,384 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildProfileSection() {
     print('Building profile section. Profile: ${_userProfile?.name ?? 'None'}');
     
-    // Add a more prominent visual indicator for the profile section
-    return Column(
-      children: [
-        Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ListTile(
-              leading: CircleAvatar(
-                radius: 30,
-                backgroundColor: ColorConstants.primaryColor,
-                child: _userProfile?.profileImagePath != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(30),
-                      child: Image.file(
-                        File(_userProfile!.profileImagePath!),
-                        width: 60,
-                        height: 60,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          print('Error loading profile image: $error');
-                          return Text(
-                            _userProfile?.name[0].toUpperCase() ?? 'U',
-                            style: const TextStyle(
-                              color: Colors.white, 
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Profile header with modern design
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  ColorConstants.primaryColor.withOpacity(0.8),
+                  ColorConstants.primaryColor.withOpacity(0.6),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  spreadRadius: 1,
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  print('Profile tile tapped, showing edit dialog');
+                  _showProfileEditDialog();
+                },
+                splashColor: Colors.white.withOpacity(0.1),
+                highlightColor: Colors.transparent,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      // Profile image
+                      Stack(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  spreadRadius: 1,
+                                  blurRadius: 5,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          );
-                        },
+                            child: CircleAvatar(
+                              radius: 40,
+                              backgroundColor: Colors.white,
+                              child: _userProfile?.profileImagePath != null
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(40),
+                                    child: Image.file(
+                                      File(_userProfile!.profileImagePath!),
+                                      width: 80,
+                                      height: 80,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        print('Error loading profile image: $error');
+                                        return Text(
+                                          _userProfile?.name[0].toUpperCase() ?? 'U',
+                                          style: TextStyle(
+                                            color: ColorConstants.primaryColor, 
+                                            fontSize: 32,
+                                            fontWeight: FontWeight.bold
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  )
+                                : Text(
+                                    _userProfile?.name[0].toUpperCase() ?? 'U',
+                                    style: TextStyle(
+                                      color: ColorConstants.primaryColor, 
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold
+                                    ),
+                                  ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: ColorConstants.primaryColor,
+                                  width: 2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.edit_rounded,
+                                color: ColorConstants.primaryColor,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    )
-                  : Text(
-                      _userProfile?.name[0].toUpperCase() ?? 'U',
-                      style: const TextStyle(
-                        color: Colors.white, 
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold
+                      
+                      const SizedBox(width: 20),
+                      
+                      // User info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _userProfile?.name ?? 'User',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Account created: ${_formatDate(_userProfile?.createdAt)}',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.edit_rounded,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Edit Profile',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-              ),
-              title: Text(
-                _userProfile?.name ?? 'User',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                    ],
+                  ),
                 ),
               ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Tap to edit your profile',
-                    style: TextStyle(
-                      fontStyle: FontStyle.italic,
-                    ),
+            ),
+          ),
+          
+          // Setup wizard button with more modern style
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  spreadRadius: 1,
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  print('Navigating to user setup screen');
+                  Navigator.pushNamed(context, AppRouter.userSetup);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Account created: ${_userProfile?.createdAt.toString().substring(0, 10) ?? 'Unknown'}',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 12,
-                    ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: ColorConstants.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.person_add_rounded,
+                          color: ColorConstants.primaryColor,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Complete Setup',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: ColorConstants.primaryColor,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Configure your preferences and personal details',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: ColorConstants.primaryColor,
+                        size: 16,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-              trailing: Container(
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Unknown';
+    
+    try {
+      return DateFormat('MMM d, yyyy').format(date);
+    } catch (e) {
+      return date.toString().substring(0, 10);
+    }
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: ColorConstants.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              color: ColorConstants.primaryColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsCard(Widget child) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            spreadRadius: 0,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildModernListTile({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    Color? iconColor,
+    VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: ColorConstants.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
+                  color: (iconColor ?? ColorConstants.primaryColor).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: const Icon(
-                  Icons.edit,
-                  color: ColorConstants.primaryColor,
+                child: Icon(
+                  icon,
+                  color: iconColor ?? ColorConstants.primaryColor,
+                  size: 22,
                 ),
               ),
-              onTap: () {
-                print('Profile tile tapped, showing edit dialog');
-                _showProfileEditDialog();
-              },
-            ),
-          ),
-        ),
-        
-        // Add a button to go to the full user setup flow
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: InkWell(
-            onTap: () {
-              print('Navigating to user setup screen');
-              Navigator.pushNamed(context, AppRouter.userSetup);
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.person_add,
-                    color: ColorConstants.primaryColor,
-                    size: 18,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Go to Complete Setup Wizard',
-                    style: TextStyle(
-                      color: ColorConstants.primaryColor,
-                      fontWeight: FontWeight.bold,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
-                ],
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
+              if (trailing != null) trailing,
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 
@@ -318,49 +881,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text(
-            'Preferences',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        ListTile(
-          leading: const Icon(Icons.public),
-          title: const Text('Country'),
-          subtitle: Row(
+        _buildSectionHeader('Preferences', Icons.tune_rounded),
+        _buildSettingsCard(
+          Column(
             children: [
-              Text(_userProfile?.country?.flagEmoji ?? '🌍'),
-              const SizedBox(width: 8),
-              Text(_userProfile?.country?.displayName ?? 'Not set'),
+              _buildModernListTile(
+                icon: Icons.public,
+                title: 'Country',
+                subtitle: '${_userProfile?.country?.flagEmoji ?? '🌍'} ${_userProfile?.country?.displayName ?? 'Not set'}',
+                trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () => _showCountrySelector(),
+              ),
+              const Divider(height: 1, indent: 56),
+              _buildModernListTile(
+                icon: Icons.currency_exchange,
+                title: 'Default Currency',
+                subtitle: _userProfile?.defaultCurrencyCode ?? 'USD',
+                trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () => _showCurrencySelector(),
+              ),
+              const Divider(height: 1, indent: 56),
+              _buildModernListTile(
+                icon: Icons.language,
+                title: 'Language',
+                subtitle: _userProfile?.locale ?? 'English (en_US)',
+                trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () => _showLanguageSelector(),
+              ),
             ],
           ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            _showCountrySelector();
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.currency_exchange),
-          title: const Text('Default Currency'),
-          subtitle: Text(_userProfile?.defaultCurrencyCode ?? 'USD'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            _showCurrencySelector();
-          },
-        ),
-        
-        ListTile(
-          leading: const Icon(Icons.language),
-          title: const Text('Language'),
-          subtitle: Text(_userProfile?.locale ?? 'English (en_US)'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            _showLanguageSelector();
-          },
         ),
       ],
     );
@@ -370,39 +919,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text(
-            'Appearance',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+        _buildSectionHeader('Appearance', Icons.palette_rounded),
+        _buildSettingsCard(
+          Column(
+            children: [
+              _buildModernListTile(
+                icon: Icons.brightness_6,
+                title: 'Theme',
+                subtitle: 'Dark Mode (Default)',
+                trailing: const Icon(Icons.info_outline, size: 20, color: Colors.grey),
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('This app only supports Dark Mode'),
+                    duration: Duration(seconds: 2),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, indent: 56),
+              _buildModernListTile(
+                icon: Icons.color_lens,
+                title: 'Dynamic Colors',
+                subtitle: 'Use system accent colors',
+                trailing: Switch(
+                  value: (_userProfile?.appColor == null),
+                  activeColor: ColorConstants.primaryColor,
+                  onChanged: (value) => _toggleDynamicColors(value),
+                ),
+                onTap: () => _toggleDynamicColors(!(_userProfile?.appColor == null)),
+              ),
+            ],
           ),
-        ),
-        ListTile(
-          leading: const Icon(Icons.brightness_6),
-          title: const Text('Theme'),
-          subtitle: Text(_getThemeModeName(_userProfile?.themeMode ?? 'system')),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            _showThemeSelector();
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.color_lens),
-          title: const Text('Dynamic Colors'),
-          subtitle: const Text('Use system accent colors'),
-          trailing: Switch(
-            value: (_userProfile?.appColor == null),
-            activeColor: ColorConstants.primaryColor,
-            onChanged: (value) {
-              _toggleDynamicColors(value);
-            },
-          ),
-          onTap: () {
-            _toggleDynamicColors(!(_userProfile?.appColor == null));
-          },
         ),
       ],
     );
@@ -412,39 +958,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text(
-            'Interface',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+        _buildSectionHeader('Interface', Icons.dashboard_customize_rounded),
+        _buildSettingsCard(
+          Column(
+            children: [
+              _buildModernListTile(
+                icon: Icons.fullscreen,
+                title: 'Large FAB Size',
+                subtitle: 'Use larger floating action buttons',
+                trailing: Switch(
+                  value: _userProfile?.useLargeFab ?? true,
+                  activeColor: ColorConstants.primaryColor,
+                  onChanged: (value) => _toggleFabSize(value),
+                ),
+                onTap: () => _toggleFabSize(!(_userProfile?.useLargeFab ?? true)),
+              ),
+              const Divider(height: 1, indent: 56),
+              _buildModernListTile(
+                icon: Icons.dashboard_customize,
+                title: 'Dashboard Layout',
+                subtitle: _getDashboardLayoutName(_userProfile?.dashboardLayout ?? 'default'),
+                trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () => _showDashboardLayoutSelector(),
+              ),
+            ],
           ),
-        ),
-        ListTile(
-          leading: const Icon(Icons.fullscreen),
-          title: const Text('Large FAB Size'),
-          subtitle: const Text('Use larger floating action buttons'),
-          trailing: Switch(
-            value: _userProfile?.useLargeFab ?? true,
-            activeColor: ColorConstants.primaryColor,
-            onChanged: (value) {
-              _toggleFabSize(value);
-            },
-          ),
-          onTap: () {
-            _toggleFabSize(!(_userProfile?.useLargeFab ?? true));
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.dashboard_customize),
-          title: const Text('Dashboard Layout'),
-          subtitle: Text(_getDashboardLayoutName(_userProfile?.dashboardLayout ?? 'default')),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            _showDashboardLayoutSelector();
-          },
         ),
       ],
     );
@@ -454,40 +992,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text(
-            'Security',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+        _buildSectionHeader('Security', Icons.security_rounded),
+        _buildSettingsCard(
+          Column(
+            children: [
+              _buildModernListTile(
+                icon: Icons.notifications,
+                title: 'Notifications',
+                trailing: Switch(
+                  value: _userProfile?.notificationsEnabled ?? true,
+                  activeColor: ColorConstants.primaryColor,
+                  onChanged: (value) => _toggleNotifications(value),
+                ),
+                onTap: () => _toggleNotifications(!(_userProfile?.notificationsEnabled ?? true)),
+              ),
+              const Divider(height: 1, indent: 56),
+              _buildModernListTile(
+                icon: Icons.fingerprint,
+                title: 'Biometric Authentication',
+                subtitle: 'Use fingerprint or face ID to secure app access',
+                trailing: Switch(
+                  value: _userProfile?.isBiometricEnabled ?? false,
+                  activeColor: ColorConstants.primaryColor,
+                  onChanged: (value) => _toggleBiometricAuthentication(value),
+                ),
+                onTap: () => _toggleBiometricAuthentication(!(_userProfile?.isBiometricEnabled ?? false)),
+              ),
+            ],
           ),
-        ),
-        ListTile(
-          leading: const Icon(Icons.notifications),
-          title: const Text('Notifications'),
-          trailing: Switch(
-            value: _userProfile?.notificationsEnabled ?? true,
-            activeColor: ColorConstants.primaryColor,
-            onChanged: _toggleNotifications,
-          ),
-          onTap: () {
-            _toggleNotifications(!(_userProfile?.notificationsEnabled ?? true));
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.fingerprint),
-          title: const Text('Biometric Authentication'),
-          subtitle: const Text('Use fingerprint or face ID to secure app access'),
-          trailing: Switch(
-            value: _userProfile?.isBiometricEnabled ?? false,
-            activeColor: ColorConstants.primaryColor,
-            onChanged: _toggleBiometricAuthentication,
-          ),
-          onTap: () {
-            _toggleBiometricAuthentication(!(_userProfile?.isBiometricEnabled ?? false));
-          },
         ),
       ],
     );
@@ -497,213 +1029,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text(
-            'Data',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        ListTile(
-          leading: const Icon(Icons.backup),
-          title: const Text('Backup Data'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            _showBackupDialog();
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.restore),
-          title: const Text('Restore Data'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            _showRestoreDialog();
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.delete_forever, color: Colors.redAccent),
-          title: const Text('Clear All Data'),
-          subtitle: const Text('Permanently delete all your data'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            _showClearDataDialog();
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSupportSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text(
-            'Support',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        // Developer Support Card
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                ColorConstants.primaryColor.withOpacity(0.1),
-                ColorConstants.primaryColor.withOpacity(0.05),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: ColorConstants.primaryColor.withOpacity(0.2),
-              width: 1,
-            ),
-          ),
-          child: Column(
+        _buildSectionHeader('Data', Icons.storage_rounded),
+        _buildSettingsCard(
+          Column(
             children: [
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: ColorConstants.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.code,
-                    color: ColorConstants.primaryColor,
-                  ),
-                ),
-                title: const Text(
-                  'Developer Support',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                subtitle: const Text(
-                  'Aneesh (Ozric)',
-                  style: TextStyle(
-                    fontSize: 14,
-                  ),
-                ),
+              _buildModernListTile(
+                icon: Icons.backup,
+                title: 'Backup Data',
+                subtitle: 'Save your data to a file',
+                trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () => _showBackupDialog(),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'Support the development of Paisa Track',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey,
-                  ),
-                ),
+              const Divider(height: 1, indent: 56),
+              _buildModernListTile(
+                icon: Icons.restore,
+                title: 'Restore Data',
+                subtitle: 'Restore from a backup file',
+                trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () => _showRestoreDialog(),
               ),
-              const SizedBox(height: 8),
-              // eSewa Payment Button
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // TODO: Implement eSewa payment
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('eSewa payment coming soon!'),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.payment),
-                  label: const Text('Support via eSewa'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ColorConstants.primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              // eSewa Number Display
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.phone, size: 16),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'eSewa: 9865236409',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
+              const Divider(height: 1, indent: 56),
+              _buildModernListTile(
+                icon: Icons.delete_forever,
+                title: 'Clear All Data',
+                subtitle: 'Permanently delete all your data',
+                iconColor: Colors.redAccent,
+                trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () => _showClearDataDialog(),
               ),
             ],
-          ),
-        ),
-        // Share App Card
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.green.withOpacity(0.1),
-                Colors.green.withOpacity(0.05),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.green.withOpacity(0.2),
-              width: 1,
-            ),
-          ),
-          child: ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.share,
-                color: Colors.green,
-              ),
-            ),
-            title: const Text(
-              'Share App',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            subtitle: const Text(
-              'Tell others about Paisa Track',
-              style: TextStyle(
-                fontSize: 14,
-              ),
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _shareApp,
           ),
         ),
       ],
@@ -714,56 +1068,186 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Text(
-            'About',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+        _buildSectionHeader('About', Icons.info_rounded),
+        _buildSettingsCard(
+          Column(
+            children: [
+              _buildModernListTile(
+                icon: Icons.info,
+                title: 'About Paisa Track',
+                trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () => Navigator.pushNamed(context, AppRouter.about),
+              ),
+              const Divider(height: 1, indent: 56),
+              _buildModernListTile(
+                icon: Icons.system_update,
+                title: 'Update Settings',
+                subtitle: 'Manage app updates and configuration',
+                trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () => Navigator.pushNamed(context, AppRouter.updateSettingsRoute),
+              ),
+              const Divider(height: 1, indent: 56),
+              _buildModernListTile(
+                icon: Icons.update,
+                title: 'Check for Updates',
+                trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () async {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Checking for updates...'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                  await UpdateService.checkForUpdates(context, force: true);
+                },
+              ),
+              const Divider(height: 1, indent: 56),
+              _buildModernListTile(
+                icon: Icons.description,
+                title: 'Terms of Service',
+                trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () => _showTermsOfService(),
+              ),
+              const Divider(height: 1, indent: 56),
+              _buildModernListTile(
+                icon: Icons.privacy_tip,
+                title: 'Privacy Policy',
+                trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                onTap: () => _showPrivacyPolicy(),
+              ),
+            ],
           ),
         ),
-        ListTile(
-          leading: const Icon(Icons.info),
-          title: const Text('About Paisa Track'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            Navigator.pushNamed(context, AppRouter.about);
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.update),
-          title: const Text('Check for Updates'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () async {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Checking for updates...'),
-                duration: Duration(seconds: 1),
-              ),
-            );
-            // Import the update service and force check for updates
-            await UpdateService.checkForUpdates(context, force: true);
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.description),
-          title: const Text('Terms of Service'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            _showTermsOfService();
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.privacy_tip),
-          title: const Text('Privacy Policy'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            _showPrivacyPolicy();
-          },
-        ),
       ],
+    );
+  }
+  
+  void _showGitHubRepoSettings() async {
+    final username = await UpdateService.getGithubUsername();
+    final repo = await UpdateService.getGithubRepo();
+    
+    // Controllers for text fields
+    final usernameController = TextEditingController(text: username);
+    final repoController = TextEditingController(text: repo);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('GitHub Repository Settings'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Configure the GitHub repository to use for update checks.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'GitHub Username',
+                  border: OutlineInputBorder(),
+                  hintText: 'e.g., octocat',
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: repoController,
+                decoration: const InputDecoration(
+                  labelText: 'Repository Name',
+                  border: OutlineInputBorder(),
+                  hintText: 'e.g., my-app',
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'The app will look for releases in:\nhttps://github.com/[username]/[repo]/releases',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          TextButton(
+            child: const Text('Verify'),
+            onPressed: () async {
+              final newUsername = usernameController.text.trim();
+              final newRepo = repoController.text.trim();
+              
+              if (newUsername.isEmpty || newRepo.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Username and repository name cannot be empty'),
+                    backgroundColor: ColorConstants.errorColor,
+                  ),
+                );
+                return;
+              }
+              
+              // Save the new values
+              await UpdateService.saveGithubDetails(newUsername, newRepo);
+              
+              // Verify the repository
+              final isValid = await UpdateService.verifyGithubRepository();
+              
+              if (context.mounted) {
+                if (isValid) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Repository verified successfully'),
+                      backgroundColor: ColorConstants.successColor,
+                    ),
+                  );
+                  Navigator.of(context).pop();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Repository could not be verified. Please check the details and try again.'),
+                      backgroundColor: ColorConstants.errorColor,
+                    ),
+                  );
+                }
+              }
+            },
+          ),
+          TextButton(
+            child: const Text('Save'),
+            onPressed: () async {
+              final newUsername = usernameController.text.trim();
+              final newRepo = repoController.text.trim();
+              
+              if (newUsername.isEmpty || newRepo.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Username and repository name cannot be empty'),
+                    backgroundColor: ColorConstants.errorColor,
+                  ),
+                );
+                return;
+              }
+              
+              // Save the new values
+              await UpdateService.saveGithubDetails(newUsername, newRepo);
+              
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('GitHub repository settings saved'),
+                    backgroundColor: ColorConstants.successColor,
+                  ),
+                );
+                Navigator.of(context).pop();
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -1255,7 +1739,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 SizedBox(height: 16),
                 Text('Please grant storage permission in your device settings:'),
-                SizedBox(height: 8),
                 Text('1. Open device Settings'),
                 Text('2. Go to Apps or Applications'),
                 Text('3. Find Paisa Track'),
@@ -1372,7 +1855,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
-                                  backupPath,
+                                  backupPath ?? 'Unknown location',
                                   style: TextStyle(
                                     fontFamily: 'monospace',
                                     fontSize: 12,
@@ -2159,185 +2642,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showThemeSelector() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choose Theme'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildThemeOption('Light', 'light'),
-            _buildThemeOption('Dark', 'dark'),
-            _buildThemeOption('System Default', 'system'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildThemeOption(String title, String value) {
-    final isSelected = _userProfile?.themeMode == value;
-    
-    return ListTile(
-      title: Text(title),
-      leading: Icon(
-        value == 'light' 
-          ? Icons.wb_sunny 
-          : value == 'dark' 
-            ? Icons.nights_stay 
-            : Icons.settings_suggest,
-      ),
-      trailing: isSelected 
-        ? const Icon(Icons.check, color: ColorConstants.primaryColor) 
-        : null,
-      onTap: () async {
-        Navigator.of(context).pop();
-        
-        if (_userProfile == null) return;
-        
-        try {
-          // Create updated user profile with the new theme
-          final updatedProfile = _userProfile!.copyWith(
-            themeMode: value,
-          );
-          
-          // Save to repository
-          await _repository.updateUserProfile(updatedProfile);
-          
-          // Reload profile
-          _loadUserProfile();
-          
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Theme updated to $title'),
-                backgroundColor: ColorConstants.successColor,
-              ),
-            );
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error updating theme: $e'),
-                backgroundColor: ColorConstants.errorColor,
-              ),
-            );
-          }
-        }
-      },
-    );
-  }
-
-  void _showLanguageSelector() {
-    final languages = [
-      {'name': 'English (US)', 'code': 'en_US'},
-      {'name': 'Hindi', 'code': 'hi_IN'},
-      {'name': 'Spanish', 'code': 'es_ES'},
-      {'name': 'French', 'code': 'fr_FR'},
-      {'name': 'German', 'code': 'de_DE'},
-      {'name': 'Chinese', 'code': 'zh_CN'},
-      {'name': 'Japanese', 'code': 'ja_JP'},
-      {'name': 'Russian', 'code': 'ru_RU'},
-      {'name': 'Arabic', 'code': 'ar_SA'},
-      {'name': 'Portuguese', 'code': 'pt_BR'},
-      {'name': 'Nepali', 'code': 'ne_NP'},
-    ];
-    
-    showDialog(
-      context: context,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Container(
-          width: double.maxFinite,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Select Language',
+                'App Theme',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 16),
-              
-              Flexible(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.5,
-                  ),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: languages.length,
-                    itemBuilder: (context, index) {
-                      final language = languages[index];
-                      final isSelected = _userProfile?.locale == language['code'];
-                      
-                      return ListTile(
-                        title: Text(language['name']!),
-                        trailing: isSelected 
-                          ? const Icon(Icons.check, color: ColorConstants.primaryColor) 
-                          : null,
-                        onTap: () async {
-                          Navigator.of(context).pop();
-                          
-                          if (_userProfile == null) return;
-                          
-                          try {
-                            // Create updated user profile with the new language
-                            final updatedProfile = _userProfile!.copyWith(
-                              locale: language['code'],
-                            );
-                            
-                            // Save to repository
-                            await _repository.updateUserProfile(updatedProfile);
-                            
-                            // Reload profile
-                            _loadUserProfile();
-                            
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Language updated to ${language['name']}'),
-                                  backgroundColor: ColorConstants.successColor,
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Error updating language: $e'),
-                                  backgroundColor: ColorConstants.errorColor,
-                                ),
-                              );
-                            }
-                          }
-                        },
-                      );
-                    },
-                  ),
+              const SizedBox(height: 8),
+              const Text(
+                'This app only supports Dark Mode',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
                 ),
               ),
-              
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                ],
+              const SizedBox(height: 20),
+              _buildThemeOptionCard('Dark', 'dark', Colors.blueGrey),
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
               ),
             ],
           ),
@@ -2346,335 +2684,299 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _shareApp() async {
-    try {
-      // Get app info
-      final packageInfo = await PackageInfo.fromPlatform();
-      final appName = packageInfo.appName;
-      final version = packageInfo.version;
-      
-      // Create share message with platform-specific details
-      final shareMessage = 'Check out $appName v$version - Your personal finance manager!\n\n'
-          'I\'ve been using $appName to manage my finances and track expenses. '
-          'It helps me stay on top of my money with a clean and simple interface.\n\n'
-          'Get it from our GitHub: https://github.com/aneesh/paisa_track\n\n'
-          'Developed with ❤️ in Nepal by Aneesh (Ozric)\n'
-          'eSewa: 9865236409';
-      
-      // Handle sharing with position origin for iPad compatibility
-      final box = context.findRenderObject() as RenderBox?;
-      
-      // Show share dialog
-      final result = await Share.share(
-        shareMessage,
-        subject: 'Check out $appName - Your personal finance manager!',
-        sharePositionOrigin: box != null 
-            ? box.localToGlobal(Offset.zero) & box.size
-            : null,
-      );
-      
-      // Handle share result
-      if (result.status == ShareResultStatus.success) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Thanks for sharing Paisa Track!'),
-              backgroundColor: ColorConstants.successColor,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error sharing app: $e'),
-            backgroundColor: ColorConstants.errorColor,
-          ),
-        );
-      }
-    }
-  }
-
-  void _showFeedbackDialog() {
-    final feedbackController = TextEditingController();
+  Widget _buildThemeOptionCard(String title, String value, Color accentColor) {
+    final isSelected = _userProfile?.themeMode == value;
+    final isDark = value == 'dark';
     
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Send Feedback'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Help us improve Paisa Track by sharing your thoughts and suggestions:'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: feedbackController,
-              decoration: const InputDecoration(
-                hintText: 'Your feedback here...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 5,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () async {
+          Navigator.of(context).pop();
+          
+          if (_userProfile == null) return;
+          
+          try {
+            // Create updated user profile with the new theme mode
+            final updatedProfile = _userProfile!.copyWith(
+              themeMode: value,
+            );
+            
+            // Save to repository
+            await _repository.updateUserProfile(updatedProfile);
+            
+            // Reload profile
+            _loadUserProfile();
+            
+            // Update the app theme - convert string to ThemeMode enum
+            final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+            themeProvider.setThemeMode(_stringToThemeMode(value));
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Theme updated to $title'),
+                  backgroundColor: ColorConstants.successColor,
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error updating theme: $e'),
+                  backgroundColor: ColorConstants.errorColor,
+                ),
+              );
+            }
+          }
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? accentColor : Colors.grey.shade300,
+              width: isSelected ? 2 : 1,
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: ColorConstants.primaryColor,
-            ),
-            onPressed: () {
-              Navigator.of(context).pop();
-              
-              if (feedbackController.text.trim().isNotEmpty) {
-                // Mock implementation - would send feedback to backend in real app
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Thank you for your feedback!'),
-                    backgroundColor: ColorConstants.successColor,
-                  ),
-                );
-              }
-            },
-            child: const Text('Submit'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showClearDataDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear All Data'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'WARNING: This action cannot be undone!',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'All your data including accounts, transactions, categories, budgets, and settings will be permanently deleted.',
-            ),
-            SizedBox(height: 12),
-            Text(
-              'We recommend creating a backup before proceeding.',
-              style: TextStyle(fontStyle: FontStyle.italic),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              foregroundColor: Colors.white,
-              backgroundColor: Colors.red,
-            ),
-            onPressed: () async {
-              Navigator.of(context).pop();
-              
-              // Show confirmation dialog
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Confirm Data Deletion'),
-                  content: const Text(
-                    'Type "DELETE" to confirm you want to permanently erase all data:',
-                  ),
-                  actions: [
-                    TextField(
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: 'Type DELETE here',
-                      ),
-                      onSubmitted: (value) {
-                        if (value == 'DELETE') {
-                          Navigator.of(context).pop();
-                          _performDataClear();
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Type "DELETE" exactly to confirm'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      },
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Theme preview
+              Container(
+                height: 64,
+                width: 100,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: isDark ? Colors.grey.shade900 : Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      spreadRadius: 0,
+                      blurRadius: 5,
+                      offset: const Offset(0, 2),
                     ),
-                    const SizedBox(height: 16),
+                  ],
+                  border: Border.all(
+                    color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // App bar preview
+                    Container(
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: accentColor,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          topRight: Radius.circular(8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // Content preview
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        children: [
+                          Container(
+                            height: 8,
+                            width: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: accentColor,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Container(
+                              height: 6,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(3),
+                                color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // More content
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(3),
+                          color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(3),
+                          color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(3),
+                          color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Theme info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (isSelected) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: accentColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'ACTIVE',
+                              style: TextStyle(
+                                color: accentColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _getThemeDescription(value),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          _getThemeIcon(value),
+                          size: 16,
+                          color: accentColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _getThemeMode(value),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: accentColor,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
-              );
-            },
-            child: const Text('Clear All Data'),
+              ),
+              // Selected indicator
+              if (isSelected)
+                Container(
+                  height: 24,
+                  width: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: accentColor,
+                  ),
+                  child: const Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+            ],
           ),
-        ],
+        ),
       ),
     );
+  }
+
+  // Helper method to convert string theme value to ThemeMode enum
+  ThemeMode _stringToThemeMode(String value) {
+    switch (value) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      case 'system':
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  String _getThemeDescription(String themeMode) {
+    switch (themeMode) {
+      case 'light':
+        return 'Light theme with bright colors';
+      case 'dark':
+        return 'Dark theme with reduced brightness';
+      case 'system':
+      default:
+        return 'Follows your device system settings';
+    }
   }
   
-  void _performDataClear() async {
-    // Show loading dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Clearing all data...'),
-          ],
-        ),
-      ),
-    );
-    
-    try {
-      // Use the database service to clear all data
-      final databaseService = DatabaseService();
-      await databaseService.clearAllData();
-      
-      // Simulate additional processing time
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Reload profile
-      await _loadUserProfile();
-      
-      // Close loading dialog
-      if (mounted) {
-        Navigator.of(context).pop();
-        
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('All data has been cleared successfully'),
-            backgroundColor: ColorConstants.successColor,
-            duration: Duration(seconds: 5),
-          ),
-        );
-      }
-    } catch (e) {
-      // Close loading dialog
-      if (mounted) {
-        Navigator.of(context).pop();
-        
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error clearing data: $e'),
-            backgroundColor: ColorConstants.errorColor,
-          ),
-        );
-      }
-    }
-  }
-
-  String _getDashboardLayoutName(String layout) {
-    switch (layout) {
-      case 'default':
-        return 'Default';
-      case 'compact':
-        return 'Compact';
-      case 'expanded':
-        return 'Expanded';
+  String _getThemeMode(String themeMode) {
+    switch (themeMode) {
+      case 'light':
+        return 'Light Mode';
+      case 'dark':
+        return 'Dark Mode';
+      case 'system':
       default:
-        return 'Unknown';
+        return 'Auto Mode';
     }
   }
-
-  void _showDashboardLayoutSelector() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choose Dashboard Layout'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildDashboardLayoutOption('Default', 'default'),
-            _buildDashboardLayoutOption('Compact', 'compact'),
-            _buildDashboardLayoutOption('Expanded', 'expanded'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDashboardLayoutOption(String title, String value) {
-    final isSelected = _userProfile?.dashboardLayout == value;
-    
-    return ListTile(
-      title: Text(title),
-      trailing: isSelected ? const Icon(Icons.check, color: ColorConstants.primaryColor) : null,
-      onTap: () async {
-        Navigator.of(context).pop();
-        
-        if (_userProfile == null) return;
-        
-        try {
-          // Create updated user profile with the new dashboard layout
-          final updatedProfile = _userProfile!.copyWith(
-            dashboardLayout: value,
-          );
-          
-          // Save to repository
-          await _repository.updateUserProfile(updatedProfile);
-          
-          // Reload profile
-          _loadUserProfile();
-          
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Dashboard layout updated to $title'),
-                backgroundColor: ColorConstants.successColor,
-              ),
-            );
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error updating dashboard layout: $e'),
-                backgroundColor: ColorConstants.errorColor,
-              ),
-            );
-          }
-        }
-      },
-    );
+  
+  IconData _getThemeIcon(String themeMode) {
+    switch (themeMode) {
+      case 'light':
+        return Icons.wb_sunny_outlined;
+      case 'dark':
+        return Icons.nights_stay_outlined;
+      case 'system':
+      default:
+        return Icons.settings_suggest_outlined;
+    }
   }
 
   void _toggleFabSize(bool value) async {
@@ -2800,6 +3102,437 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     }
   }
+
+  void _showLanguageSelector() {
+    // Implementation for showing language selector dialog
+    showDialog(
+      context: context,
+      builder: (context) {
+        return LanguageSelectorDialog(
+          currentLanguageCode: _userProfile?.locale ?? 'en_US',
+          onLanguageSelected: (languageCode) async {
+            if (_userProfile != null) {
+              final updatedProfile = _userProfile!.copyWith(
+                locale: languageCode,
+              );
+              
+              await _repository.updateUserProfile(updatedProfile);
+              _loadUserProfile();
+              
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Language updated'),
+                    backgroundColor: Color(0xFF10B981),
+                  ),
+                );
+              }
+            }
+          },
+        );
+      },
+    );
+  }
+  
+  String _getDashboardLayoutName(String layout) {
+    switch (layout) {
+      case 'default':
+        return 'Default';
+      case 'compact':
+        return 'Compact';
+      case 'expanded':
+        return 'Expanded';
+      default:
+        return 'Default';
+    }
+  }
+  
+  void _showDashboardLayoutSelector() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Dashboard Layout'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildLayoutOption('Default', 'default'),
+              _buildLayoutOption('Compact', 'compact'),
+              _buildLayoutOption('Expanded', 'expanded'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  Widget _buildLayoutOption(String title, String value) {
+    final isSelected = _userProfile?.dashboardLayout == value;
+    
+    return ListTile(
+      title: Text(title),
+      trailing: isSelected 
+        ? const Icon(Icons.check, color: Color(0xFF4F46E5))
+        : null,
+      onTap: () async {
+        Navigator.pop(context);
+        
+        if (_userProfile != null) {
+          final updatedProfile = _userProfile!.copyWith(
+            dashboardLayout: value,
+          );
+          
+          await _repository.updateUserProfile(updatedProfile);
+          _loadUserProfile();
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Dashboard layout changed to $title'),
+                backgroundColor: const Color(0xFF10B981),
+              ),
+            );
+          }
+        }
+      },
+    );
+  }
+  
+  void _showClearDataDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Clear All Data'),
+          content: const Text(
+            'This will reset your app and remove all your data. This action cannot be undone.',
+            style: TextStyle(color: Color(0xFFEF4444)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+              onPressed: () {
+                Navigator.pop(context);
+                // Implementation for clearing data
+                _clearAllData();
+              },
+              child: const Text('Clear Data'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  Future<void> _clearAllData() async {
+    // Show loading indicator
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // Clear data logic would go here
+      await Future.delayed(const Duration(seconds: 2));
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All data has been cleared'),
+            backgroundColor: Color(0xFF10B981),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error clearing data: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+  
+  void _shareApp() {
+    // Implementation for sharing the app
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Share feature coming soon'),
+        backgroundColor: Color(0xFF3B82F6),
+      ),
+    );
+  }
+
+  Widget _buildSupportSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('Support', Icons.support_rounded),
+        
+        // Developer Support Card
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                ColorConstants.primaryColor.withOpacity(0.15),
+                ColorConstants.primaryColor.withOpacity(0.05),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                spreadRadius: 0,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header row
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: ColorConstants.primaryColor.withOpacity(0.2),
+                              blurRadius: 8,
+                              spreadRadius: 0,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.code_rounded,
+                          color: ColorConstants.primaryColor,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Developer Support',
+                              style: TextStyle(
+                                color: ColorConstants.primaryColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Aneesh (Ozric)',
+                              style: TextStyle(
+                                color: Colors.black87,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Description
+                  const Text(
+                    'Support the development of Paisa Track and help us bring more features!',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // eSewa Payment Button
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: ColorConstants.primaryColor.withOpacity(0.3),
+                          blurRadius: 8,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // TODO: Implement eSewa payment
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('eSewa payment coming soon!'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.payment),
+                      label: const Text(
+                        'Support via eSewa',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColorConstants.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // eSewa Number Display
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.grey.shade300,
+                        width: 1,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.phone_rounded,
+                          size: 18,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(width: 10),
+                        Text(
+                          'eSewa: 9865236409',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        
+        // Share App Card
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                spreadRadius: 0,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: _shareApp,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.share_rounded,
+                        color: Colors.green,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Share App',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Tell others about Paisa Track',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Colors.grey,
+                      size: 16,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class CountrySelectionDialog extends StatefulWidget {
@@ -2899,7 +3632,7 @@ class _CountrySelectionDialogState extends State<CountrySelectionDialog> {
                       style: const TextStyle(fontSize: 24),
                     ),
                     title: Text(country.displayName),
-                    trailing: isSelected ? const Icon(Icons.check, color: ColorConstants.primaryColor) : null,
+                    trailing: isSelected ? const Icon(Icons.check, color: Color(0xFF4F46E5)) : null,
                     onTap: () {
                       setState(() {
                         _selectedCountry = country;
@@ -3046,7 +3779,7 @@ class _CurrencySelectionDialogState extends State<CurrencySelectionDialog> {
                     ),
                     title: Text(currency.name),
                     subtitle: Text(currency.code),
-                    trailing: isSelected ? const Icon(Icons.check, color: ColorConstants.primaryColor) : null,
+                    trailing: isSelected ? const Icon(Icons.check, color: Color(0xFF4F46E5)) : null,
                     onTap: () {
                       setState(() {
                         _selectedCurrencyCode = currency.code;
