@@ -38,6 +38,25 @@
 - Improved error messaging and user feedback
 - Enhanced database integrity verification
 
+## 1.0.0-beta.7+7 (April 15, 2025)
+
+### Added
+- **Update Settings Screen**: Added a dedicated screen for managing app updates
+- **GitHub Repository Configuration**: Added ability to configure the GitHub repository for app updates
+- **Update Check Controls**: Added toggle for enabling/disabling automatic update checks
+- **Manual Update Check**: Added option to manually check for updates
+
+### Improved
+- **Enhanced Update Service**: Improved internet connectivity checks and error handling
+- **Multiple Domain Testing**: App now tries multiple domains to verify internet connectivity
+- **Retry Mechanism**: Added retry logic for GitHub API requests with exponential backoff
+- **Better Error Messages**: More descriptive error messages for update failures
+
+### Fixed
+- Fixed "Update check failed" dialog appearing when there's no internet connection
+- Fixed "No route defined for /settings/updates" error when navigating to update settings
+- Fixed GitHub repository details to correctly match the actual repository
+
 ## 1.0.0-beta.6+6 (April 3, 2025)
 
 ### New Features
